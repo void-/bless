@@ -10,6 +10,4 @@ fsm:
 .PHONY: clean
 
 clean:
-	for f in docs; do  \
-    rm -f $f.aux $f.log $f.pdf;
-	done
+	rm -f *.aux *.log *.pdf
