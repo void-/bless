@@ -51,5 +51,21 @@ When the message channel is stale, it means the Receiver has moved unbeknownst
 to the Server. The Server will continue to attempt to communicate with the
 Receiver using this channel even though the Receiver isn't listening.
 \end{itemize}
+\pagebreak
+
+\section*{Message format}
+%Can this use some form of OTR or a ratchet?
+\subsection*{Sender $\rightarrow$ Server}
+\begin{tabular}{c c c}
+  $Sig_{k_{sender}}\left(mail\right)$ & $256$B &
+    Signature of the entire rest of the mail contents\\
+  $E_{k_{server}}\left(k_{sym}\right)$ & $256$B &
+    Encryption of a symmetric key under the Server's public key\\
+  $E_{k_{sym}}\left(m\right)$ & $\left[0, 2^{16} - 512 \right]$B &
+    Encryption of the message with the symmetric key
+
+\end{tabular}
+
+\subsection*{Server $\rightarrow$ Receiver}
 
 \end{document}
