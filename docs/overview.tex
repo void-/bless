@@ -1,0 +1,31 @@
+\documentclass[11pt]{article}
+\usepackage{tikz}
+
+\title{Bless, a pager\footnote{not like less}}
+\author{void-}
+
+\begin{document}
+\maketitle
+
+\pagebreak
+\section*{Definitions}
+\begin{itemize}
+\item Sender \\
+The entity that wishes to send a single message to the Receiver via the Server.
+This can represent a number of authenticated individuals.
+\item Server \\
+The publicly routable server that authenticates messages from the Sender and
+forwards them to the Receiver. Generally, the Server and the Receiver are
+owned by the same individual.
+\item Receiver \\
+The entity that should receive a message from the Sender via the Server. The
+Receiver's physical location in the world is consider private.
+\item Message channel \\
+The private communication channel established between the Server and Receiver.
+\item Stale \\
+When the message channel is stale, it means the Receiver has moved unbeknownst
+to the Server. The Server will continue to attempt to communicate with the
+Receiver using this channel even though the Receiver isn't listening.
+\end{itemize}
+
+\end{document}
