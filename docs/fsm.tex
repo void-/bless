@@ -29,6 +29,36 @@
 
 \end{tikzpicture}
 
+\subsection*{States}
+\begin{itemize}
+\item down \\
+The service on the Server is not running.
+\item up:? \\
+The Server is running, but the message channel is down. A `?' means the routing
+address of the Receiver is not known.
+\item up:! \\
+The Server is running and it has establish a message channel with the Receiver.
+\end{itemize}
+
+\subsection*{Recv mail, leave message}
+The Sender sends mail to the Server but the message channel is down. The server
+saves the message and delivers it when the message channel is next established.
+\subsection*{Recv mail, delivery failure}
+The Sender sends mail to the Server. The Server attempts to deliver it to the
+Receiver, but the message channel was stale(i.e. the Receiver moved). The
+Server saves the message and delivers it when the message channel is next
+established.
+\subsection*{Refresh connection}
+The Server sends a refresh message over the message channel to keep the
+connection open. This is for NAT traversal to prevent the initial connection
+from being killed.
+\subsection*{Recv mail, delivery success}
+The Sender sends mail to the Server. The Server successfully delivers it to the
+Receiver and the message channel remains established.
+\subsection*{Location report}
+The Receiver transitions from down to up and the message channel is
+established.
+
 \pagebreak
 
 \section*{FSM for Receiver}
@@ -45,10 +75,10 @@
 \end{tikzpicture}
 
 \subsection*{Reveal location}
-Receiver makes an initial connection to Server, bootstraping the message
+The Receiver makes an initial connection to Server, bootstraping the message
 channel.
 \subsection*{Receive Message}
-Server sends a message to Receiver via the message channel and authenticates
+The Server sends a message to the Receiver via the message channel and authenticates
 it.
 \subsection*{Move}
 The Receiver moves, connecting to a different network or otherwise not
