@@ -21,10 +21,14 @@ behind a NAT.
 \begin{tikzpicture}
 \node[draw, circle] at (0,0) (sender) {Sender};
 \node[draw, rectangle] at (4,0) (server) {Server};
-\node[draw, circle] at (6,0) (anonymizer) {anonymizer};
-\node[draw, rectangle] at (8,0) (receiver) {Receiver};
+\node[draw, circle] at (7,0) (anonymizer) {anonymizer};
+\node[draw, rectangle] at (12,0) (receiver) {Receiver};
 
-\draw[arrows={-latex}, line width=.5mm] (sender) to (server);
+\draw[arrows={-latex}, line width=.5mm]
+  (sender) to node[above] {Mail} (server);
+\draw[arrows={-latex}, line width=.5mm] (server) to (anonymizer);
+\draw[arrows={-latex}, line width=.5mm]
+  (anonymizer) to node[above] {message channel} (receiver);
 \end{tikzpicture}
 
 \pagebreak
