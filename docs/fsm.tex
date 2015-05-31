@@ -84,5 +84,17 @@ it.
 The Receiver moves, connecting to a different network or otherwise not
 listening on the message channel.
 
+\pagebreak
+
+\section*{FSM for Sender}
+\begin{tikzpicture}
+\node[draw, circle, scale=2] at (0,0) (online) {online};
+\path[arrows={-latex}, out=40, in=60, distance=60mm, line width=.5mm]
+  (online) edge[loop] node[right] {Send mail} (online);
+\end{tikzpicture}
+
+\subsection*{Send mail}
+The Sender sends an authenticated mail to the Server. It will either fail, if
+the Server is down or the routing address is stale, or succeed.
 
 \end{document}
