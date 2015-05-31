@@ -5,18 +5,33 @@
 
 \begin{document}
 
-\section*{FSM for server}
+\section*{FSM for Server}
 \begin{tikzpicture}
 \node[draw, circle, scale=2] at (0,8.5) (down) {down};
 \node[draw, circle, scale=2] at (0,5) (upUk) {up:?};
 \node[draw, circle, scale=2] at (0,0) (upK) {up:!};
 
 \draw[arrows={-latex}, line width=.5mm, scale=2] (down) to (upUk);
+%location unknown to known
+\draw[arrows={-latex}, line width=.5mm, scale=2]
+  (upUk) to [out=330, in=15] node[right] {Location report} (upK);
+%known -> unknown
+\draw[arrows={-latex}, line width=.5mm, scale=2]
+  (upK) to [out=165, in=210] node[left] {recv mail, delivery failure} (upUk);
+
+\path[arrows={-latex}, out=230, in=250, distance=30mm, line width=.5mm]
+  (upK) edge[loop] node[below] {Refresh connection} (upK);
+\path[arrows={-latex}, out=300, in=320, distance=30mm, line width=.5mm]
+  (upK) edge[loop] node[right] {recv mail, delivery success} (upK);
+
+\path[arrows={-latex}, out=160, in=180, distance=30mm, line width=.5mm]
+  (upUk) edge[loop] node[left] {recv mail, leave message} (upUk);
+
 \end{tikzpicture}
 
 \pagebreak
 
-\section*{FSM for receiver}
+\section*{FSM for Receiver}
 \begin{tikzpicture}
 \node[draw, circle, scale=2] at (0,4) (off) {offline};
 \node[draw, circle, scale=2] at (0,0) (on) {online};
