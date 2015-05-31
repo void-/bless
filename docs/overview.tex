@@ -1,11 +1,31 @@
 \documentclass[11pt]{article}
 \usepackage{tikz}
 
+\usetikzlibrary{arrows}
+
 \title{Bless, a pager\footnote{not like less}}
 \author{void-}
 
 \begin{document}
 \maketitle
+\section*{Overview}
+\subsection*{Goal}
+The Sender wishes to send a message to (page) the Receiver in real time. The
+location of the Receiver should be private and the confidentiality, integrity,
+and authenticity of the message should be preserved. The Sender must also be
+approved to send messages to the Receiver, that is to say, not just anyone can
+send a message to the Receiver. The system should work even if the Receiver is
+behind a NAT.
+
+\section*{An illustration}
+\begin{tikzpicture}
+\node[draw, circle] at (0,0) (sender) {Sender};
+\node[draw, rectangle] at (4,0) (server) {Server};
+\node[draw, circle] at (6,0) (anonymizer) {anonymizer};
+\node[draw, rectangle] at (8,0) (receiver) {Receiver};
+
+\draw[arrows={-latex}, line width=.5mm] (sender) to (server);
+\end{tikzpicture}
 
 \pagebreak
 \section*{Definitions}
