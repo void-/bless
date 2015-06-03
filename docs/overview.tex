@@ -31,6 +31,30 @@ behind a NAT.
   (anonymizer) to node[above] {message channel} (receiver);
 \end{tikzpicture}
 
+\section*{How it works}
+Alice is the Sender, Bob the Receiver. Alice wants to send a message to Bob
+while Bob is in an undisclosed location with internet access. Prior to this,
+Alice and Bob exchanged public keys and the routing address of Bob's server(the
+Server).
+
+Bob, somewhere in the world, is connected to a NATed wifi with his device.
+Using an anonymity network, Bob initially makes a TCP connection to the Server.
+This bootstraps the message channel. Bob will then send a UDP packet to the
+Server; this creates a UDP hole punch in the NAT to facilitate a push protocol
+between the Server and Bob. The Server will send periodic, empty UDP packets
+over the message channel to keep the hole punch active.
+
+If Alice sends the Server a message, the Server will authenticate it and
+forward this onto Bob. If Bob changes his physical location in the world, the
+UDP packets sent by the Server will unknowingly go undelivered.
+
+\subsection*{Why isn't Bob just a Tor hidden service that moves?}
+\begin{itemize}
+\item Bob's mobile device has a small battery so a push protocol is desired
+\item Alice is considered an luser\footnote{local user}, she is neither capable
+of connecting to the Tor network nor capable of running sophisticated software.
+\end{itemize}
+
 \pagebreak
 \section*{Definitions}
 \begin{itemize}
