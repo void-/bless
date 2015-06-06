@@ -87,8 +87,9 @@ Receiver using this channel even though the Receiver isn't listening.
     Encryption of a symmetric key under the Server's public key\\
   $E_{k_{sym}}\left(m\right)$ & $\left[0, 2^{16} - 512 \right]$B &
     Encryption of the message with the symmetric key
-
 \end{tabular}
+The current design uses deterministic encryption. It will not prevent replay
+attacks.
 
 \subsection*{Server $\rightarrow$ Receiver}
 
