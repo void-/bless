@@ -10,12 +10,12 @@
 \maketitle
 \section*{Overview}
 \subsection*{Goal}
-The Sender wishes to send a message to (page) the Receiver in real time. The
-location of the Receiver should be private and the confidentiality, integrity,
-and authenticity of the message should be preserved. The Sender must also be
-approved to send messages to the Receiver, that is to say, not just anyone can
-send a message to the Receiver. The system should work even if the Receiver is
-behind a NAT.
+The Sender wishes to send a message to (i.e. page) the Receiver in real time.
+The location of the Receiver should be private and the confidentiality,
+integrity, and authenticity of the message should be preserved. The Sender must
+also be approved to send messages to the Receiver, that is to say, not just
+anyone can send a message to the Receiver. The system should work even if the
+Receiver is behind a NAT.
 
 \section*{An illustration}
 \begin{tikzpicture}
@@ -53,6 +53,8 @@ UDP packets sent by the Server will unknowingly go undelivered.
 \item Bob's mobile device has a small battery so a push protocol is desired
 \item Alice is considered an luser\footnote{local user}, she is neither capable
 of connecting to the Tor network nor capable of running sophisticated software.
+\item This should be a real time protocol. Reducing latency is desired and the
+anonymizer in the message channel is optional.
 \end{itemize}
 
 \pagebreak
