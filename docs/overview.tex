@@ -41,7 +41,9 @@ Bob, somewhere in the world, is connected to a NATed wifi with his device.
 Using an anonymity network, Bob initially makes a TCP connection to the Server.
 This bootstraps the message channel. Bob will then send a UDP packet to the
 Server; this creates a UDP hole punch in the NAT to facilitate a push protocol
-between the Server and Bob. The Server will send periodic, empty UDP packets
+between the Server and Bob. The Server will send periodic, empty UDP
+packets\footnote{it doesn't matter if these are authenticated, an attacker can
+keep the connection alive}
 over the message channel to keep the hole punch active.
 
 If Alice sends the Server a message, the Server will authenticate it and
@@ -51,10 +53,12 @@ UDP packets sent by the Server will unknowingly go undelivered.
 \subsection*{Why isn't Bob just a Tor hidden service that moves?}
 \begin{itemize}
 \item Bob's mobile device has a small battery so a push protocol is desired
+\item The use of an anonymizer between connections to the server is optional
 \item Alice is considered an luser\footnote{local user}, she is neither capable
 of connecting to the Tor network nor capable of running sophisticated software.
-% Consider Alice being able to run `staticaly-linked' python scripts;
+% Consider Alice being able to run `statically-linked' python scripts;
 %  A mail server is hard to set up and requires root permissions
+% She's still unable to make a TLS connection, this is too much
 \item This should be a real time protocol. Reducing latency is desired and the
 anonymizer in the message channel is optional.
 \item I wanted to design my own protocol.
@@ -97,5 +101,16 @@ The current design uses deterministic encryption. It will not prevent replay
 attacks.
 
 \subsection*{Server $\rightarrow$ Receiver}
+
+\subsection*{Steps from Server $\rightarrow$ Receiver}
+\begin{itemize}
+  \item Receiver establishes TCP connection to Server
+  \item Diffie-Hellman key exchange between Server and Receiver yields
+  $k_{mac}$ and $k_{enc}$
+  \item Close TCP connection and create UDP hole punch
+  %use OTR here by tricks with the mac key
+  \item Receiver receives, over UDP, $E_{k_{mac}}\left{\right}$
+
+\end{itemize}
 
 \end{document}
