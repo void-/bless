@@ -37,18 +37,20 @@ while Bob is in an undisclosed location with internet access. Prior to this,
 Alice and Bob exchanged public keys and the routing address of Bob's server(the
 Server).
 
-Bob, somewhere in the world, is connected to a NATed wifi with his device.
-Using an anonymity network, Bob initially makes a TCP connection to the Server.
-This bootstraps the message channel. Bob will then send a UDP packet to the
-Server; this creates a UDP hole punch in the NAT to facilitate a push protocol
-between the Server and Bob. The Server will send periodic, empty UDP
+Bob, somewhere in the world, is connected to a NATed wifi router with his
+device. Using an anonymity network\footnote{connecting to an anonymity network
+is optional}, Bob initially makes a TCP connection to the Server. This
+bootstraps the message channel. Bob will then send a UDP packet to the Server;
+this creates a UDP hole punch in the NAT to facilitate a push protocol between
+the Server and Bob. The Server will send periodic, empty UDP
 packets\footnote{it doesn't matter if these are authenticated, an attacker can
-keep the connection alive}
-over the message channel to keep the hole punch active.
+keep the connection alive} over the message channel to keep the hole punch
+active.
 
 If Alice sends the Server a message, the Server will authenticate it and
-forward this onto Bob. If Bob changes his physical location in the world, the
-UDP packets sent by the Server will unknowingly go undelivered.
+forward this onto Bob. If Bob changes his physical location in the world, he
+doesn't kill the connection; the UDP packets sent by the Server will
+unknowingly go undelivered.
 
 \subsection*{Why isn't Bob just a Tor hidden service that moves?}
 \begin{itemize}
@@ -109,7 +111,7 @@ attacks.
   $k_{mac}$ and $k_{enc}$
   \item Close TCP connection and create UDP hole punch
   %use OTR here by tricks with the mac key
-  \item Receiver receives, over UDP, $E_{k_{mac}}\left{\right}$
+  \item Receiver receives, over UDP, $E_{k_{mac}}\left(\right)$
 
 \end{itemize}
 
