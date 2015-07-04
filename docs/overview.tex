@@ -56,13 +56,12 @@ unknowingly go undelivered.
 \begin{itemize}
 \item Bob's mobile device has a small battery so a push protocol is desired
 \item The use of an anonymizer between connections to the server is optional
-\item Alice is considered an luser\footnote{local user}, she is neither capable
-of connecting to the Tor network nor capable of running sophisticated software.
+\item Alice is considered an luser\footnote{local user}, she is not capable
+of connecting to the Tor network.
 % Consider Alice being able to run `statically-linked' python scripts;
 %  A mail server is hard to set up and requires root permissions
 % She's still unable to make a TLS connection, this is too much
-\item This should be a real time protocol. Reducing latency is desired and the
-anonymizer in the message channel is optional.
+\item This should be a real time protocol. Reducing latency is desired.
 \item I wanted to design my own protocol.
 \end{itemize}
 
@@ -87,6 +86,10 @@ to the Server. The Server will continue to attempt to communicate with the
 Receiver using this channel even though the Receiver isn't listening.
 \end{itemize}
 \pagebreak
+
+%The only things that the Server should be responsible for are routing and
+%authenticating the Sender. Auth could be optional, but it would reduce
+%computational load on the Receiver.
 
 \section*{Message format}
 %Can this use some form of OTR or a ratchet?
