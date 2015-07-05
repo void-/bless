@@ -1,6 +1,8 @@
 #ifndef CONNECTIONS_H
 #define CONNECTIONS_H
 
+#include "auth.h"
+
 int tcpBootstrap(char const *host, unsigned short port,
   struct serverAuthKeys const *, struct sessionKeys *);
 
