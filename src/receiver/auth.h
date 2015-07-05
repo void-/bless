@@ -4,12 +4,12 @@
 /**
  * The length in bytes of symmetric session keys.
  */
-const unsigned SYM_KEY_BYTES = 16u;
+#define SYM_KEY_BYTES 16u
 
 /**
  * The length in bytes of the public keys used for authentication.
  */
-const unsigned PUB_KEY_BYTES = 32u;
+#define PUB_KEY_BYTES 32u
 
 /**
  * Contains long-standing authentication keys for the Server and the Receiver.
@@ -27,8 +27,15 @@ struct serverAuthKeys
  */
 struct sessionKeys
 {
-  unsigned char keyEnc[KEY_BYTES];
-  unsigned char keyMac[KEY_BYTES];
+  unsigned char keyEnc[SYM_KEY_BYTES];
+  unsigned char keyMac[SYM_KEY_BYTES];
+};
+
+/**
+ * Key suite shared with the Sender used to encrypt a single message.
+ */
+struct messageKeys
+{
 };
 
 #endif //AUTH_H
