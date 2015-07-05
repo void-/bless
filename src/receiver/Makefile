@@ -3,7 +3,7 @@ CFLAGS =
 LDFLAGS =
 BIN = "listen"
 
-RM = "rm -f"
+RM = rm -f
 
 all: main
 
