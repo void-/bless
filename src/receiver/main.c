@@ -1,5 +1,5 @@
 /**
- * @file main.c
+ * @file
  * @brief run as the Receiver role in the protocol.
  */
 
@@ -43,7 +43,7 @@ int argParser(int argc, char **argv, struct listenArgs *argOut)
  * -# call tcpBootstrap()
  * -# call udpBootstrap()
  * -# call listenLoop()
- * -# write back to persistent storage
+ * -# write back Sender to Receiver key data to persistent storage
  *
  * @param argc length of \p argv.
  * @param argv argument vector to run the Receiver in the form of:

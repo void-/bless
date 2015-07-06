@@ -22,13 +22,41 @@ struct serverAuthKeys
 };
 
 /**
+ * @struct sessionKeys
+ * @brief temporary keys between the Server and Receiver.
+ *
  * The symmetric keys derived from the Diffie Hellman exchange between the
  * Server and Receiver. This is the result of tcpBootstrap().
+ *
+ * Different keys are needed for both directions: Server to Receiver and for
+ * Receiver to Server.
+ *
+ * @var unsigned char sessionKeys::keyEnServer
+ * @brief encryption key for Server->Receiver.
+ *
+ * symmetric encryption key used by the Server to send to the Receiver.
+ *
+ * @var unsigned char sessionKeys::keyMacServer
+ * @brief mac key for Server->Receiver.
+ *
+ * message authentication key used by the Server to send to the Receiver.
+ *
+ * @var unsigned char sessionKeys::keyEnReceiver
+ * @brief encryption key for Receiver->Server
+ *
+ * symmetric encryption key used by the Receiver to send to the Server.
+ *
+ * @var unsigned char sessionKeys::keyMacReceiver
+ * @brief mac key for Receiver->Server
+ *
+ * message authentication key used by the Receiver to send to the Server.
  */
 struct sessionKeys
 {
-  unsigned char keyEnc[SYM_KEY_BYTES];
-  unsigned char keyMac[SYM_KEY_BYTES];
+  unsigned char keyEnServer[SYM_KEY_BYTES];
+  unsigned char keyMacServer[SYM_KEY_BYTES];
+  unsigned char keyEnReceiver[SYM_KEY_BYTES];
+  unsigned char keyMacReceiver[SYM_KEY_BYTES];
 };
 
 /**

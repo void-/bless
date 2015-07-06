@@ -1,5 +1,5 @@
 /**
- * @file connections.c
+ * @file
  * @brief manage network connections between the Receiver and the Server.
  */
 
