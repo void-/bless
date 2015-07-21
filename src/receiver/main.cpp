@@ -7,17 +7,26 @@
 #include "connections.h"
 
 #include <string>
+#include <iostream>
 
 /**
- * @struct listenArgs
+ * @struct ListenArgs
  * @brief parsed command lines arguments.
  *
- * @var std::string listenArgs::serverAddress
+ * @var std::string ListenArgs::serverAddress
  * @brief ip address of the Server
+ *
+ * @var std::string ListenArgs::serverKeyFile
+ * @brief path to the Server's public key on disk
+ *
+ * @var std::string ListenArgs::receiverKeyFile
+ * @brief path to the Receiver's private key on disk
  */
 struct ListenArgs
 {
   std::string serverAddress;
+  std::string serverKeyFile;
+  std::string receiverKeyFile;
 };
 
 /**
