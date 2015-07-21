@@ -6,6 +6,10 @@
 #ifndef AUTH_H
 #define AUTH_H
 
+#include <botan/pk_keys.h>
+
+#include <istream>
+
 namespace Bless
 {
   /**
@@ -20,6 +24,11 @@ namespace Bless
   {
     public:
       AuthKeys();
+      int init(std::istream &serverKeyFile, std::istream &receiverKeyFile);
+      ~AuthKeys();
+    private:
+      Botan::Public_Key const *serverKey;
+      Botan::Private_Key const *receiverKey;
   };
 }
 
