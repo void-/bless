@@ -1,3 +1,8 @@
+/**
+ * @file
+ * @brief definitions for authentication between Receiver and Server.
+ */
+
 #ifndef AUTH_H
 #define AUTH_H
 
