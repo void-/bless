@@ -11,15 +11,22 @@
  */
 #define PUB_KEY_BYTES 32u
 
-/**
- * Contains long-standing authentication keys for the Server and the Receiver.
- *
- * Public key of the Server.
- * Private key of the Receiver.
- */
-struct serverAuthKeys
+namespace Bless
 {
-};
+  /**
+   * @brief Long-standing authentication keys for the message channel.
+   *
+   * This should be staged into memory from disk.
+   *
+   * Public key of the Server.
+   * Private key of the Receiver.
+   */
+  class AuthKeys
+  {
+    public:
+      AuthKeys();
+  };
+}
 
 /**
  * @struct sessionKeys
