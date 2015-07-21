@@ -6,16 +6,18 @@
 #include "auth.h"
 #include "connections.h"
 
+#include <string>
+
 /**
  * @struct listenArgs
  * @brief parsed command lines arguments.
  *
- * @var char *listenArgs::serverAddress
+ * @var std::string listenArgs::serverAddress
  * @brief ip address of the Server
  */
-struct listenArgs
+struct ListenArgs
 {
-  char *serverAddress;
+  std::string serverAddress;
 };
 
 /**
@@ -28,7 +30,7 @@ struct listenArgs
  * @param argOut pointer to the structure to write parsed arguments to.
  * @return zero on success, non-zero on failure.
  */
-int argParser(int argc, char **argv, struct listenArgs *argOut)
+int argParser(int argc, char **argv, ListenArgs *argOut)
 {
 
 }
