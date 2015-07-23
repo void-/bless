@@ -13,12 +13,19 @@
 namespace Bless
 {
   /**
+   * @class AuthKeys
    * @brief Long-standing authentication keys for the message channel.
    *
    * This should be staged into memory from disk.
    *
-   * Public key of the Server.
-   * Private key of the Receiver.
+   * The keys are preshared, by some external PKI, and used for authenticated
+   * Diffie-Hellman.
+   *
+   * @var Botan::PublicKey const *AuthKeys::serverKey
+   * @brief public signing key of the Server.
+   *
+   * @var Botan::Private_Key const *AuthKeys::receiverKey;
+   * @brief private signing key of the Receiver.
    */
   class AuthKeys
   {
