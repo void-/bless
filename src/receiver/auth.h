@@ -31,8 +31,8 @@ namespace Bless
   {
     public:
       AuthKeys();
-      int init(std::istream &serverKeyFile, std::istream &receiverKeyFile);
       ~AuthKeys();
+      int init(std::istream &server, std::istream &receiver);
     private:
       Botan::Public_Key const *serverKey;
       Botan::Private_Key const *receiverKey;
