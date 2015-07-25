@@ -51,9 +51,7 @@ int argParser(int argc, char **argv, ListenArgs *argOut)
  * -# parse arguments
  * -# load persistent keys
  * -# register signal handlers for interupting
- * -# call tcpBootstrap()
- * -# call udpBootstrap()
- * -# call listenLoop()
+ * -# create a new Channel(), listening for messages
  * -# write back Sender to Receiver key data to persistent storage
  *
  * @param argc length of \p argv.
