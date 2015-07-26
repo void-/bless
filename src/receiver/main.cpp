@@ -10,38 +10,79 @@
 #include <iostream>
 
 /**
+ * Directory path to default resources.
+ */
+#define RESOURCE_PATH "./"
+
+using namespace Bless;
+
+/**
  * @struct ListenArgs
  * @brief parsed command lines arguments.
  *
  * @var std::string ListenArgs::serverAddress
  * @brief ip address of the Server
  *
- * @var std::string ListenArgs::serverKeyFile
- * @brief path to the Server's public key on disk
- *
  * @var std::string ListenArgs::receiverKeyFile
  * @brief path to the Receiver's private key on disk
+ *
+ * @var std::string ListenArgs::serverKeyFile
+ * @brief path to the Server's public key on disk
  */
 struct ListenArgs
 {
+  int init(int argc, char **argv);
+
   std::string serverAddress;
-  std::string serverKeyFile;
   std::string receiverKeyFile;
+  std::string serverKeyFile;
+  unsigned short port;
+
+  static const std::string defaultServerKeyFile;
+  static const unsigned short defaultPort = 8675;
 };
+const std::string ListenArgs::defaultServerKeyFile = RESOURCE_PATH"server.pem";
 
 /**
  * @brief parse the arguments passed into main().
  *
  * Parse command line arguments and write them out to an argument structure.
+ * \p argv should take the form:
+ *  @code binary serverAddress ReceiverPrivateKey [ServerPublicKey]@endcode
  *
  * @param argc argc from main().
  * @param argv argv from main().
- * @param argOut pointer to the structure to write parsed arguments to.
  * @return zero on success, non-zero on failure.
  */
-int argParser(int argc, char **argv, ListenArgs *argOut)
+int ListenArgs::init(int argc, char **argv)
 {
+  if(argc < 3)
+  {
+    //too few arguments
+    return -1;
+  }
 
+  if(argc > 4)
+  {
+    //too many arguments
+    return -2;
+  }
+
+  //pull out the required arguments
+  serverAddress = std::string(argv[1]);
+  receiverKeyFile = std::string(argv[2]);
+
+  //check for optional argument
+  if(argc > 3)
+  {
+    serverKeyFile = std::string(argv[3]);
+  }
+  else
+  {
+    serverKeyFile = defaultServerKeyFile;
+  }
+
+  return 0;
 }
 
 /**
@@ -55,10 +96,21 @@ int argParser(int argc, char **argv, ListenArgs *argOut)
  * -# write back Sender to Receiver key data to persistent storage
  *
  * @param argc length of \p argv.
- * @param argv argument vector to run the Receiver in the form of:
- *  @code binary serverAddress privateKey @endcode
+ * @param argv argument vector to run the Receiver, parsed by argParser().
  * @return non-zero on failure.
  */
 int main(int argc, char **argv)
 {
+  int error = 0;
+  ListenArgs args;
+  AuthKeys authKeys;
+
+  //parse the arguments
+  if((error = args.init(argc, argv)))
+  {
+    goto fail;
+  }
+
+fail:
+  return error;
 }
