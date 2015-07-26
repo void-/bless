@@ -7,7 +7,9 @@
 #include "connections.h"
 
 #include <string>
-#include <iostream>
+#include <fstream>
+
+#include <botan/auto_rng.h>
 
 /**
  * Directory path to default resources.
@@ -28,6 +30,9 @@ using namespace Bless;
  *
  * @var std::string ListenArgs::serverKeyFile
  * @brief path to the Server's public key on disk
+ *
+ * @var unsigned short ListenArgs::port
+ * @brief udp port to connect to the Server on
  *
  * @var std::string ListenArgs::defaultServerKeyFile
  * @brief default file to load the Server's public key from
@@ -89,6 +94,9 @@ int ListenArgs::init(int argc, char **argv)
     serverKeyFile = defaultServerKeyFile;
   }
 
+  //no parsing for port yet
+  port = defaultPort;
+
   return 0;
 }
 
@@ -111,9 +119,16 @@ int main(int argc, char **argv)
   int error = 0;
   ListenArgs args;
   AuthKeys authKeys;
+  Botan::AutoSeeded_RNG rng;
 
   //parse the arguments
   if((error = args.init(argc, argv)))
+  {
+    goto fail;
+  }
+
+  //stage in the authentication keys
+  if((error = authKeys.init(args.serverKeyFile, args.receiverKeyFile, rng)))
   {
     goto fail;
   }
