@@ -41,27 +41,21 @@ namespace Bless
    * If this function fails to deserialize the inputs, the object still is not
    * valid.
    *
-   * This function takes std::istreams and constructs DataSources from them.
-   * This allows error handling for creating the std::istream be determined by
-   * the caller rather than this function.
-   *
    * The keys must be signing keys.
    *
-   * @param server stream to deserialize the Server's X509 encoded Public_Key.
-   * @param receiver stream to deserialize the Receiver's Private_Key from.
+   * @param server filename for Server's X509 encoded Public_Key.
+   * @param receiver filename to deserialize the Receiver's PKCS8 key from.
    * @param rng random number generator for loading the private key.
    * @return 0 on success, non-zero on failure.
    */
-  int AuthKeys::init(std::istream &server, std::istream &receiver,
+  int AuthKeys::init(std::string const &server, std::string const &receiver,
       RandomNumberGenerator& rng)
   {
-    DataSource_Stream pubSource(server);
-    DataSource_Stream privSource(receiver);
 
     //deserialize the public key
     try
     {
-      serverKey = X509::load_key(pubSource);
+      serverKey = X509::load_key(server);
     }
     catch(Decoding_Error &e)
     {
@@ -71,7 +65,7 @@ namespace Bless
     //deserialize the private key
     try
     {
-      receiverKey = PKCS8::load_key(privSource, rng);
+      receiverKey = PKCS8::load_key(receiver, rng);
     }
     catch(PKCS8_Exception &e)
     {

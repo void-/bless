@@ -32,7 +32,7 @@ namespace Bless
     public:
       AuthKeys();
       ~AuthKeys();
-      int init(std::istream &server, std::istream &receiver,
+      int init(std::string const &server, std::string const &receiver,
         Botan::RandomNumberGenerator &rng);
     private:
       Botan::Public_Key const *serverKey;
