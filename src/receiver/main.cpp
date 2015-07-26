@@ -28,6 +28,12 @@ using namespace Bless;
  *
  * @var std::string ListenArgs::serverKeyFile
  * @brief path to the Server's public key on disk
+ *
+ * @var std::string ListenArgs::defaultServerKeyFile
+ * @brief default file to load the Server's public key from
+ *
+ * @var unsigned short ListenArgs::defaultPort
+ * @brief default port to use to connect to the Server
  */
 struct ListenArgs
 {
@@ -41,6 +47,7 @@ struct ListenArgs
   static const std::string defaultServerKeyFile;
   static const unsigned short defaultPort = 8675;
 };
+
 const std::string ListenArgs::defaultServerKeyFile = RESOURCE_PATH"server.pem";
 
 /**
@@ -48,7 +55,7 @@ const std::string ListenArgs::defaultServerKeyFile = RESOURCE_PATH"server.pem";
  *
  * Parse command line arguments and write them out to an argument structure.
  * \p argv should take the form:
- *  @code binary serverAddress ReceiverPrivateKey [ServerPublicKey]@endcode
+ *  @code binary serverAddress receiverPrivateKey [ServerPublicKey]@endcode
  *
  * @param argc argc from main().
  * @param argv argv from main().
