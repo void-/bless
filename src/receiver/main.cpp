@@ -7,6 +7,7 @@
 #include "connections.h"
 
 #include <string>
+#include <iostream>
 #include <fstream>
 
 #include <botan/auto_rng.h>
@@ -43,6 +44,7 @@ using namespace Bless;
 struct ListenArgs
 {
   int init(int argc, char **argv);
+  void usage() const;
 
   std::string serverAddress;
   std::string receiverKeyFile;
@@ -101,6 +103,16 @@ int ListenArgs::init(int argc, char **argv)
 }
 
 /**
+ * @brief write the expected argument format to stderr.
+ */
+void ListenArgs::usage() const
+{
+  std::cerr <<
+    "usage: ./binary serverAddress receiverPrivateKey [ServerPublicKey]" <<
+    std::endl;
+}
+
+/**
  * @brief setup and run the Receiver client.
  *
  * Steps:
@@ -124,12 +136,14 @@ int main(int argc, char **argv)
   //parse the arguments
   if((error = args.init(argc, argv)))
   {
+    args.usage();
     goto fail;
   }
 
   //stage in the authentication keys
   if((error = authKeys.init(args.serverKeyFile, args.receiverKeyFile, rng)))
   {
+    std::cerr << "Failed to load authentication keys" << std::endl;
     goto fail;
   }
 
