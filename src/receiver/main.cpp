@@ -131,6 +131,7 @@ int main(int argc, char **argv)
   int error = 0;
   ListenArgs args;
   AuthKeys authKeys;
+  Channel chan;
   Botan::AutoSeeded_RNG rng;
 
   //parse the arguments
@@ -144,6 +145,13 @@ int main(int argc, char **argv)
   if((error = authKeys.init(args.serverKeyFile, args.receiverKeyFile, rng)))
   {
     std::cerr << "Failed to load authentication keys" << std::endl;
+    goto fail;
+  }
+
+  //initialize the channel, but don't connect it yet
+  if((error = chan.init(authKeys, args.serverAddress)))
+  {
+    std::cerr << "Failed to initialize channel" << std::endl;
     goto fail;
   }
 
