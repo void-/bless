@@ -46,7 +46,13 @@ namespace Bless
 
     protected:
       Botan::TLS::Client *client;
-      //put callbacks here
+      Botan::TLS::Policy *policy;
+      void send(const Botan::byte payload[], size_t len);
+      void recv(const Botan::byte payload[], size_t len);
+      void alert(Botan::TLS::Alert, const Botan::byte payload[], size_t len);
+      void handshake(const Botan::TLS::Session &);
+
+      static const size_t bufferSize = 4096;
     private:
       AuthKeys *authKeys;
       std::string serverAddress;
