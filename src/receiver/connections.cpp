@@ -26,7 +26,7 @@ namespace Bless
    *
    * @param keys pointer to initialized AuthKeys to use for authentication.
    * @param server ip address of the Server in the protocol.
-   * @return non-zero on error.
+   * @return non-zero on error; this implementation always returns 0.
    */
   int Channel::init(AuthKeys *keys, std::string server)
   {
@@ -39,7 +39,8 @@ namespace Bless
   /**
    * @brief make a connection to the Server.
    *
-   * This is a blocking call, it will loo
+   * This is a blocking call, it will receive connections indenfinitely until
+   * something goes wrong, at which point connect() will return.
    *
    * @param rng RandomNumberGenerator to use for making the connection
    * @param cb receive callback called whenever a new, authenticated message is

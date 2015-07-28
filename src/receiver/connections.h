@@ -21,7 +21,8 @@ namespace Bless
    * implemented as a DTLS connection.
    *
    * Packets will arrive when a message is sent from the Sender; these are
-   * unacked.
+   * unacked. The Receiver never needs to send application data, so there is
+   * no interface for that.
    *
    * When the Receiver shuts down, the DTLS connection will uncleanly be
    * shutdown, i.e. no finalizing packets will be sent by the Receiver.
