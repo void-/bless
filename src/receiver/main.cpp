@@ -149,7 +149,7 @@ int main(int argc, char **argv)
   }
 
   //initialize the channel, but don't connect it yet
-  if((error = chan.init(authKeys, args.serverAddress)))
+  if((error = chan.init(&authKeys, args.serverAddress)))
   {
     std::cerr << "Failed to initialize channel" << std::endl;
     goto fail;
