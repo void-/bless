@@ -1,5 +1,7 @@
 #include "connections.h"
 
+using namespace Botan;
+
 namespace Bless
 {
   /**
@@ -7,7 +9,7 @@ namespace Bless
    *
    * @warning invalid unless init() is called.
    */
-  Channel::Channel()
+  Channel::Channel() : sessionManager(new TLS::Session_Manager_Noop())
   {
   }
 
@@ -47,8 +49,51 @@ namespace Bless
    * received
    * @return non-zero on error.
    */
-  int Channel::connect(Botan::RandomNumberGenerator &rng, recvCallback cb)
+  int Channel::connect(RandomNumberGenerator &rng, recvCallback cb)
   {
+    client = new TLS::Client(
+      [this](const byte *const data, size_t len) {
+        this->send(data, len);
+      },
+      [this](const byte *const data, size_t len) {
+        this->recv(data, len);
+      },
+      [this](TLS::Alert alert_, const byte *const data, size_t len) {
+        this->alert(alert_, data, len);
+      },
+      [this](const TLS::Session &session) {
+        return this->handshake(session);
+      },
+      *sessionManager,
+      *credentialsManager,
+      *policy,
+      rng,
+      serverInformation,
+      TLS::Protocol_Version::latest_dtls_version(),
+      {},
+      bufferSize);
+
     return 0;
   }
+
+  void Channel::send(const byte *const payload, size_t len)
+  {
+  }
+
+  void Channel::recv(const Botan::byte *const payload, size_t len)
+  {
+
+  }
+
+  void Channel::alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
+      size_t len)
+  {
+
+  }
+
+  bool Channel::handshake(const Botan::TLS::Session &session)
+  {
+    return true;
+  }
+
 }
