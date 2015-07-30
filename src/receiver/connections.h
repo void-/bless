@@ -34,6 +34,9 @@ namespace Bless
    *
    * @var AuthKeys *Channel::authKeys
    * @brief keys used to authenticate the DTLS message channel.
+   *
+   * @var int Channel::connection
+   * @brief socket descriptor for the connection to the Server.
    */
   class Channel
   {
