@@ -51,7 +51,7 @@ namespace Bless
       Botan::TLS::Policy *policy;
       Botan::TLS::Session_Manager *sessionManager;
       Botan::Credentials_Manager *credentialsManager;
-      Botan::TLS::Server_Information serverInformation;
+      Botan::TLS::Server_Information *serverInformation;
       void send(const Botan::byte *const payload, size_t len);
       void recv(const Botan::byte *const payload, size_t len);
       void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
@@ -61,7 +61,8 @@ namespace Bless
       static const size_t bufferSize = 4096;
     private:
       AuthKeys *authKeys;
-      std::string serverAddress;
+      int connection;
+      sockaddr_in connectionInfo;
   };
 }
 #endif //CONNECTIONS_H
