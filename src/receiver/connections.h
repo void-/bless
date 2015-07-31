@@ -13,6 +13,11 @@
 #include <botan/tls_session_manager.h>
 #include <botan/credentials_manager.h>
 
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 namespace Bless
 {
   /**
@@ -46,7 +51,8 @@ namespace Bless
       Channel();
       ~Channel();
 
-      int init(AuthKeys *keys, std::string server);
+      int init(AuthKeys *keys, const std::string &server,
+        unsigned short port);
       int connect(Botan::RandomNumberGenerator &rng, recvCallback cb);
 
     protected:
