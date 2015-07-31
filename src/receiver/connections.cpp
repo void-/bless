@@ -1,5 +1,7 @@
 #include "connections.h"
 
+#include <unistd.h>
+
 using namespace Botan;
 
 namespace Bless
@@ -56,7 +58,7 @@ namespace Bless
    * @return non-zero on error.
    */
   int Channel::init(AuthKeys *keys, const std::string &server,
-      unsigned short port_)
+      unsigned short port)
   {
     in_addr address;
     authKeys = keys;
@@ -64,12 +66,12 @@ namespace Bless
     //set up the socket
     connection = socket(PF_INET, SOCK_DGRAM, 0);
     memset(&connectionInfo, 0, sizeof(connectionInfo));
-    if(!inet_aton(serverAddress.c_str(), &address))
+    if(!inet_aton(server.c_str(), &address))
     {
       //couldn't convert address
       return -1;
     }
-    connectionInfo.sin_addr = address.s_addr;
+    connectionInfo.sin_addr = address;
     connectionInfo.sin_port = htons(port);
 
     //allocate parameters for the channel
@@ -77,7 +79,7 @@ namespace Bless
     {
       policy = new TLS::Policy();
       sessionManager = new TLS::Session_Manager_Noop(); //don't keep a session
-      credentialsManager = new TLS::Credentials_Manager();
+      credentialsManager = new Botan::Credentials_Manager();
       serverInformation = new TLS::Server_Information();
     }
     catch(std::bad_alloc &e)
@@ -119,7 +121,7 @@ namespace Bless
       *credentialsManager,
       *policy,
       rng,
-      serverInformation,
+      *serverInformation,
       TLS::Protocol_Version::latest_dtls_version(),
       {},
       bufferSize);
