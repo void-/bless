@@ -9,31 +9,82 @@ namespace Bless
    *
    * @warning invalid unless init() is called.
    */
-  Channel::Channel() : sessionManager(new TLS::Session_Manager_Noop())
+  Channel::Channel() : client(nullptr), policy(nullptr)
   {
   }
 
   /**
    * @brief disconnect and destruct the Channel.
    *
+   * If Channel::client is not null, then its safe to delete everything because
+   * this is the last initialized. Likewise for Channel::policy; it is the
+   * first initialized.
+   *
    * Any resources allocated for the connection will be freed, but fields like
    * Channel::authKeys will not be.
    */
   Channel::~Channel()
   {
+    if(client)
+    {
+      delete client;
+    }
+
+    if(policy)
+    {
+      delete policy;
+      delete sessionManager;
+      delete credentialsManager;
+      delete serverInformation;
+    }
+    //XXX: does this do an *unclean* disconnect?
+    close(connection); //ignore any errors
   }
 
   /**
    * @brief initialize the Channel, but don't connect it.
    *
+   * This is where all allocation occurs.
+   *
+   * Allocate and set sockets to use in connect().
+   *
+   * Channel::client is initialized in connect().
+   *
    * @param keys pointer to initialized AuthKeys to use for authentication.
    * @param server ip address of the Server in the protocol.
-   * @return non-zero on error; this implementation always returns 0.
+   * @param port_ UDP port to connect to the Server on.
+   * @return non-zero on error.
    */
-  int Channel::init(AuthKeys *keys, std::string server)
+  int Channel::init(AuthKeys *keys, const std::string &server,
+      unsigned short port_)
   {
+    in_addr address;
     authKeys = keys;
-    serverAddress = server;
+
+    //set up the socket
+    connection = socket(PF_INET, SOCK_DGRAM, 0);
+    memset(&connectionInfo, 0, sizeof(connectionInfo));
+    if(!inet_aton(serverAddress.c_str(), &address))
+    {
+      //couldn't convert address
+      return -1;
+    }
+    connectionInfo.sin_addr = address.s_addr;
+    connectionInfo.sin_port = htons(port);
+
+    //allocate parameters for the channel
+    try
+    {
+      policy = new TLS::Policy();
+      sessionManager = new TLS::Session_Manager_Noop(); //don't keep a session
+      credentialsManager = new TLS::Credentials_Manager();
+      serverInformation = new TLS::Server_Information();
+    }
+    catch(std::bad_alloc &e)
+    {
+      //couldn't dynamically allocate memory
+      return -2;
+    }
 
     return 0;
   }
@@ -95,5 +146,4 @@ namespace Bless
   {
     return true;
   }
-
 }
