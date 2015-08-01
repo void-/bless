@@ -60,18 +60,27 @@ namespace Bless
   int Channel::init(AuthKeys *keys, const std::string &server,
       unsigned short port)
   {
+    int error = 0;
     in_addr address;
     authKeys = keys;
 
-    //set up the socket
-    connection = socket(PF_INET, SOCK_DGRAM, 0);
+    //allocate socket
+    if((connection = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+    {
+      error = -1;
+      goto fail;
+    }
     memset(&connectionInfo, 0, sizeof(connectionInfo));
+
+    //convert ip address to number
     if(!inet_aton(server.c_str(), &address))
     {
       //couldn't convert address
-      return -1;
+      error = -2;
+      goto fail;
     }
     connectionInfo.sin_addr = address;
+
     connectionInfo.sin_port = htons(port);
 
     //allocate parameters for the channel
@@ -85,10 +94,12 @@ namespace Bless
     catch(std::bad_alloc &e)
     {
       //couldn't dynamically allocate memory
-      return -2;
+      error = -3;
+      goto fail;
     }
 
-    return 0;
+fail:
+    return error;
   }
 
   /**
