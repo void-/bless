@@ -1,6 +1,7 @@
 #include "connections.h"
 
 #include <unistd.h>
+#include <iostream>
 
 using namespace Botan;
 
@@ -119,9 +120,7 @@ fail:
       [this](const byte *const data, size_t len) {
         this->send(data, len);
       },
-      [this](const byte *const data, size_t len) {
-        this->recv(data, len);
-      },
+      cb,
       [this](TLS::Alert alert_, const byte *const data, size_t len) {
         this->alert(alert_, data, len);
       },
@@ -140,21 +139,66 @@ fail:
     return 0;
   }
 
+  /**
+   * @brief callback used by the DTLS connection to send data.
+   *
+   * The interface of this callback has no way to communicate errors in-band,
+   * so a std::runtime_error is thrown on error. This can be caught above the
+   * stack and handled back in-bands.
+   *
+   * @throws std::runtime_error when writing fails.
+   * @param payload the bytes to write out to the wire.
+   * @param len the length of \p payload.
+   */
   void Channel::send(const byte *const payload, size_t len)
   {
+    if(::send(connection, payload, len, MSG_NOSIGNAL) == -1)
+    {
+      throw std::runtime_error("send failed");
+    }
   }
 
+  /**
+   * @brief callback used by the DTLS connection to receive application data.
+   *
+   * This currently writes \p payload to stdout, but should do something more
+   * sophisticated in the future.
+   *
+   * @param payload the bytes received from the Server.
+   * @param len the length of \p payload.
+   */
   void Channel::recv(const Botan::byte *const payload, size_t len)
   {
-
+    for(size_t i = 0; i < len; ++i)
+    {
+      std::cout << payload[i];
+    }
   }
 
-  void Channel::alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
-      size_t len)
+  /**
+   * @brief callback when the DTLS connection receives an encryption alert.
+   *
+   * This silently kills the connection.
+   *
+   * @param alert the alert received.
+   * @param payload not used.
+   * @param len not used.
+   */
+  void Channel::alert(Botan::TLS::Alert alert,
+      const Botan::byte *const payload, size_t len)
   {
-
+    std::cout << alert.type_string();
+    close(connection);
   }
 
+  /**
+   * @brief callback when the DTLS handshake is complete.
+   *
+   * This is called when the message channel is established.
+   *
+   * @param session not used.
+   * @return true.
+   */
   bool Channel::handshake(const Botan::TLS::Session &session)
   {
     return true;
