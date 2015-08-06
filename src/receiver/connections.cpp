@@ -123,7 +123,7 @@ namespace Bless
     //allocate parameters for the channel
     try
     {
-      policy = new TLS::Policy();
+      policy = new ChannelPolicy();
       sessionManager = new TLS::Session_Manager_Noop(); //don't keep a session
       credentialsManager = new Botan::Credentials_Manager();
       serverInformation = new TLS::Server_Information();
