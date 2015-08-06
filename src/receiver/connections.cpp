@@ -8,6 +8,42 @@ using namespace Botan;
 namespace Bless
 {
   /**
+   * @class ChannelPolicy
+   * @brief specifies the connection policy for the message channel.
+   *
+   * The ultimate goal is to use safe curves such as Curve25519 implemented in
+   * Botan. However, there is no support for this with D/TLS.
+   */
+  class ChannelPolicy : public TLS::Strict_Policy
+  {
+    /**
+     * @brief turn DTLS heartbeats on.
+     *
+     * This is critical in keeping the UDP holepunch active. Built-in heartbeat
+     * support is the key reason DTLS is used.
+     *
+     * @return true.
+     */
+    bool negotiate_hearbeat_support() const
+    {
+      return true;
+    }
+
+    /**
+     * @brief given a protocol version, return whether its ok.
+     *
+     * Only DTLS1.2 is acceptable.
+     *
+     * @param version the protocol version in question.
+     * @return whether \p version is DTLS1.2.
+     */
+    bool acceptable_protocol_version(TLS::Protocol_Version version) const
+    {
+      return version == TLS::Protocol_Version::DTLS_V12;
+    }
+  };
+
+  /**
    * @brief construct a new, unitialized, Channel.
    *
    * @warning invalid unless init() is called.
@@ -55,7 +91,7 @@ namespace Bless
    *
    * @param keys pointer to initialized AuthKeys to use for authentication.
    * @param server ip address of the Server in the protocol.
-   * @param port_ UDP port to connect to the Server on.
+   * @param port UDP port to connect to the Server on.
    * @return non-zero on error.
    */
   int Channel::init(AuthKeys *keys, const std::string &server,
