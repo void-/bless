@@ -61,20 +61,28 @@ namespace Bless
     {
       return -1;
     }
+    catch(Stream_IO_Error &e)
+    {
+      return -2;
+    }
 
     //deserialize the private key
     try
     {
       receiverKey = PKCS8::load_key(receiver, rng);
     }
-    catch(PKCS8_Exception &e)
+    catch(Stream_IO_Error &e)
     {
       return -3;
+    }
+    catch(PKCS8_Exception &e)
+    {
+      return -4;
     }
     catch(Decoding_Error &e)
     {
       //unknown algorithm
-      return -4;
+      return -5;
     }
 
     //no error otherwise
