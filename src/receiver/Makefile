@@ -1,5 +1,5 @@
 CXX = g++
-CPPFLAGS = -std=c++11 -Wall -Wextra
+CPPFLAGS = -std=c++11 -Wall -Wextra -g
 LDFLAGS = -lbotan-1.11
 BIN = "listen"
 
