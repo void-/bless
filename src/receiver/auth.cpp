@@ -13,7 +13,7 @@ namespace Bless
    *
    * @warning call init() to make this valid.
    */
-  AuthKeys::AuthKeys()
+  AuthKeys::AuthKeys() : serverKey(nullptr), receiverKey(nullptr)
   {
   }
 
