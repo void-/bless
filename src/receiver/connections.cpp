@@ -16,31 +16,154 @@ namespace Bless
    */
   class ChannelPolicy : public TLS::Strict_Policy
   {
-    /**
-     * @brief turn DTLS heartbeats on.
-     *
-     * This is critical in keeping the UDP holepunch active. Built-in heartbeat
-     * support is the key reason DTLS is used.
-     *
-     * @return true.
-     */
-    bool negotiate_hearbeat_support() const
-    {
-      return true;
-    }
+    public:
+      /**
+       * @brief turn DTLS heartbeats on.
+       *
+       * This is critical in keeping the UDP holepunch active. Built-in
+       * heartbeat support is the key reason DTLS is used.
+       *
+       * @return true.
+       */
+      bool negotiate_hearbeat_support() const
+      {
+        return true;
+      }
 
-    /**
-     * @brief given a protocol version, return whether its ok.
-     *
-     * Only DTLS1.2 is acceptable.
-     *
-     * @param version the protocol version in question.
-     * @return whether \p version is DTLS1.2.
-     */
-    bool acceptable_protocol_version(TLS::Protocol_Version version) const
-    {
-      return version == TLS::Protocol_Version::DTLS_V12;
-    }
+      /**
+       * @brief given a protocol version, return whether its ok.
+       *
+       * Only DTLS1.2 is acceptable.
+       *
+       * @param version the protocol version in question.
+       * @return whether \p version is DTLS1.2.
+       */
+      bool acceptable_protocol_version(TLS::Protocol_Version version) const
+      {
+        return version == TLS::Protocol_Version::DTLS_V12;
+      }
+  };
+
+  /**
+   * @class ChannelCredentials
+   * @brief Manage the credentials for the message channel.
+   *
+   * Essentially, interface from AuthKeys to Credentials_Manager interface.
+   */
+  class ChannelCredentials : virtual Credentials_Manager
+  {
+    public:
+      /**
+       * @brief construct a ChannelCredentials.
+       *
+       * @warning this isn't valid until init() is called.
+       */
+      ChannelCredentials()
+      {
+      }
+
+      ~ChannelCredentials() override
+      {
+      }
+
+      /**
+       * @brief initialize the ChannelCredentials given an AuthKeys.
+       *
+       * @param keys AuthKeys used for authentication; must be not null.
+       * @return non-zero on failure.
+       */
+      int init(AuthKeys *keys)
+      {
+        authKeys = keys;
+        return 0;
+      }
+
+      /**
+       * @brief return the trusted certificate authorities, i.e. the Server.
+       *
+       * The Server's public key will be in the form of a self-signed
+       * certificate. The Server is the only trusted CA.
+       *
+       * @param type the type of operation occuring.
+       * @param context a context relative to \p type.
+       * @return a vector of trusted CAs.
+       */
+      std::vector<Certificate_Store *> trusted_certificate_authorities(
+          const std::string &type, const std::string &context) override
+      {
+      }
+
+      /**
+       * @brief verify the given certificate chain for \p hostname.
+       *
+       * \p certChain should contain the Server's public key.
+       *
+       * @param type the type of operation occuring.
+       * @param hostname the hostname claimed to belong to \p certChain.
+       * @param certChain the certificate chain to verify.
+       * @throw a std::exception if its wrong.
+       */
+      void verify_certificate_chain(const std::string &type,
+          const std::string &hostname,
+          const std::vector<X509_Certificate> &certChain) override
+      {
+        Credentials_Manager::verify_certificate_chain(
+          type, hostname, certChain);
+      }
+
+      /**
+       * @brief return a certificate chain to identify the Receiver.
+       *
+       * The difference between this and
+       * Credentials_Manager::cert_chain_single_type() is cert_chain() can
+       * return any type of certificate key type (algorithm) from \p
+       * certKeyTypes.
+       *
+       * This returns the Receiver's self-signed cert; this must be
+       * communicated, to the Server by means of some externel PKI.
+       *
+       * @param certKeyTypes vector of types of keys requested, e.g.
+       *   (RSA, ECDSA)
+       * @param type the type of operation occuring
+       * @param context a context relative to \p type.
+       * @return vector containing the self-signed certificate for the
+       *   Receiver.
+       */
+      std::vector<X509_Certificate> cert_chain(const std::vector<std::string>
+          &certKeyTypes, const std::string &type, const std::string &context)
+          override
+      {
+      }
+
+      /**
+       * @brief return the private key corresponding to the given \p cert.
+       *
+       * \p cert should have been returned by cert_chain().
+       *
+       * @param cert the certificate to yield the private key for.
+       * @param type the type of operation occuring.
+       * @param context the context \p cert will be used under.
+       * @return the private half of \p cert.
+       */
+      Private_Key *private_key_for(const X509_Certificate &cert,
+          const std::string &type, const std::string &context) override
+      {
+      }
+
+      /**
+       * @brief return whether an SRP connection should be attempted.
+       *
+       * Never try SRP, use long-standing public keys.
+       *
+       * @return false.
+       */
+      bool attempt_srp(const std::string &, const std::string &) override
+      {
+        return false;
+      }
+
+    private:
+      AuthKeys *authKeys;
   };
 
   /**
