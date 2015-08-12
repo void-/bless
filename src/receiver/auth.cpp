@@ -72,6 +72,10 @@ namespace Bless
     {
       return -2;
     }
+    catch(std::bad_alloc &e)
+    {
+      return -8;
+    }
 
     //deserialize Receiver's cert
     try
@@ -85,6 +89,10 @@ namespace Bless
     catch(Stream_IO_Error &e)
     {
       return -4;
+    }
+    catch(std::bad_alloc &e)
+    {
+      return -9;
     }
 
     //deserialize Receiver's private key
