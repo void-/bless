@@ -2,6 +2,7 @@
 
 #include <botan/data_src.h>
 #include <botan/x509_key.h>
+#include <botan/x509cert.h>
 #include <botan/pkcs8.h>
 
 using namespace Botan;
@@ -13,7 +14,8 @@ namespace Bless
    *
    * @warning call init() to make this valid.
    */
-  AuthKeys::AuthKeys() : serverKey(nullptr), receiverKey(nullptr)
+  AuthKeys::AuthKeys() : serverCert(nullptr), receiverCert(nullptr),
+      receiverPrivKey(nullptr)
   {
   }
 
@@ -24,14 +26,19 @@ namespace Bless
    */
   AuthKeys::~AuthKeys()
   {
-    if(serverKey)
+    if(serverCert)
     {
-      delete serverKey;
+      delete serverCert;
     }
 
-    if(receiverKey)
+    if(receiverCert)
     {
-      delete receiverKey;
+      delete receiverCert;
+    }
+
+    if(receiverPrivKey)
+    {
+      delete receiverPrivKey;
     }
   }
 
@@ -43,19 +50,19 @@ namespace Bless
    *
    * The keys must be signing keys.
    *
-   * @param server filename for Server's X509 encoded Public_Key.
-   * @param receiver filename to deserialize the Receiver's PKCS8 key from.
+   * @param server filename for Server's X509 certificate.
+   * @param recvCert filename to deserialize the Receiver's certificate from.
+   * @param recvKey filename to deserialize the Receiver's private key from.
    * @param rng random number generator for loading the private key.
    * @return 0 on success, non-zero on failure.
    */
-  int AuthKeys::init(std::string const &server, std::string const &receiver,
-      RandomNumberGenerator& rng)
+  int AuthKeys::init(std::string const &server, std::string const &recvCert,
+      std::string const &recvKey, Botan::RandomNumberGenerator &rng)
   {
-
-    //deserialize the public key
+    //deserialize the Server's cert
     try
     {
-      serverKey = X509::load_key(server);
+      serverCert = new X509_Certificate(server);
     }
     catch(Decoding_Error &e)
     {
@@ -66,23 +73,37 @@ namespace Bless
       return -2;
     }
 
-    //deserialize the private key
+    //deserialize Receiver's cert
     try
     {
-      receiverKey = PKCS8::load_key(receiver, rng);
+      receiverCert = new X509_Certificate(recvCert);
     }
-    catch(Stream_IO_Error &e)
+    catch(Decoding_Error &e)
     {
       return -3;
     }
-    catch(PKCS8_Exception &e)
+    catch(Stream_IO_Error &e)
     {
       return -4;
+    }
+
+    //deserialize Receiver's private key
+    try
+    {
+      receiverPrivKey = PKCS8::load_key(recvKey, rng);
+    }
+    catch(Stream_IO_Error &e)
+    {
+      return -5;
+    }
+    catch(PKCS8_Exception &e)
+    {
+      return -6;
     }
     catch(Decoding_Error &e)
     {
       //unknown algorithm
-      return -5;
+      return -7;
     }
 
     //no error otherwise
