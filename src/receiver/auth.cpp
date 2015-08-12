@@ -117,4 +117,34 @@ namespace Bless
     //no error otherwise
     return 0;
   }
+
+  /**
+   * @brief return a pointer to the Server's certificate.
+   *
+   * @return serverCert.
+   */
+  Botan::X509_Certificate const *AuthKeys::getServerCert() const
+  {
+    return serverCert;
+  }
+
+  /**
+   * @brief return a pointer to the Receiver's certificate.
+   *
+   * @return receiverCert.
+   */
+  Botan::X509_Certificate const *AuthKeys::getReceiverCert() const
+  {
+    return receiverCert;
+  }
+
+  /**
+   * @brief return a pointer to the Receiver's private key.
+   *
+   * @return receiverPrivKey.
+   */
+  Botan::Private_Key *AuthKeys::getReceiverPrivKey() const
+  {
+    return receiverPrivKey;
+  }
 }

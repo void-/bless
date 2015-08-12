@@ -35,12 +35,17 @@ namespace Bless
     public:
       AuthKeys();
       ~AuthKeys();
+
       int init(std::string const &server, std::string const &recvCert,
         std::string const &recvKey, Botan::RandomNumberGenerator &rng);
+      Botan::X509_Certificate const *getServerCert() const;
+      Botan::X509_Certificate const *getReceiverCert() const;
+      Botan::Private_Key *getReceiverPrivKey() const;
+
     private:
       Botan::X509_Certificate const *serverCert;
       Botan::X509_Certificate const *receiverCert;
-      Botan::Private_Key const *receiverPrivKey;
+      Botan::Private_Key *receiverPrivKey;
   };
 }
 
