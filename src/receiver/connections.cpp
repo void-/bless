@@ -62,6 +62,11 @@ namespace Bless
       {
       }
 
+      /**
+       * @brief destruct the ChannelCredentials.
+       *
+       * Don't deallocate authKeys.
+       */
       ~ChannelCredentials() override
       {
       }
