@@ -7,6 +7,7 @@
 #define AUTH_H
 
 #include <botan/pk_keys.h>
+#include <botan/x509cert.h>
 
 #include <istream>
 

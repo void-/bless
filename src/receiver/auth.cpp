@@ -2,7 +2,6 @@
 
 #include <botan/data_src.h>
 #include <botan/x509_key.h>
-#include <botan/x509cert.h>
 #include <botan/pkcs8.h>
 
 using namespace Botan;
