@@ -29,14 +29,17 @@ using namespace Bless;
  * @var std::string ListenArgs::receiverKeyFile
  * @brief path to the Receiver's private key on disk
  *
- * @var std::string ListenArgs::serverKeyFile
- * @brief path to the Server's public key on disk
+ * @var std::string ListenArgs::receiverCertFile
+ * @brief path to the Receiver's certificate exchanged with the Server
+ *
+ * @var std::string ListenArgs::serverCertFile
+ * @brief path to the Server's certificate key on disk
  *
  * @var unsigned short ListenArgs::port
  * @brief udp port to connect to the Server on
  *
  * @var std::string ListenArgs::defaultServerKeyFile
- * @brief default file to load the Server's public key from
+ * @brief default file to load the Server's certificate key from
  *
  * @var unsigned short ListenArgs::defaultPort
  * @brief default port to use to connect to the Server
@@ -48,21 +51,29 @@ struct ListenArgs
 
   std::string serverAddress;
   std::string receiverKeyFile;
-  std::string serverKeyFile;
+  std::string receiverCertFile;
+  std::string serverCertFile;
   unsigned short port;
 
-  static const std::string defaultServerKeyFile;
+  static const std::string defaultReceiverCertFile;
+  static const std::string defaultServerCertFile;
   static const unsigned short defaultPort = 8675;
 };
 
-const std::string ListenArgs::defaultServerKeyFile = RESOURCE_PATH"server.pem";
+const std::string ListenArgs::defaultReceiverCertFile =
+  RESOURCE_PATH"receiver.pem";
+const std::string ListenArgs::defaultServerCertFile =
+  RESOURCE_PATH"server.pem";
 
 /**
  * @brief parse the arguments passed into main().
  *
  * Parse command line arguments and write them out to an argument structure.
  * \p argv should take the form:
- *  @code binary serverAddress receiverPrivateKey [ServerPublicKey]@endcode
+ *  @code binary serverAddress receiverPrivateKey [receiverCertificate]
+ *    [serverCertificate] [port]@endcode
+ *
+ *  @bug the optional arguments are not parsed.
  *
  * @param argc argc from main().
  * @param argv argv from main().
@@ -76,7 +87,7 @@ int ListenArgs::init(int argc, char **argv)
     return -1;
   }
 
-  if(argc > 4)
+  if(argc > 5)
   {
     //too many arguments
     return -2;
@@ -87,14 +98,8 @@ int ListenArgs::init(int argc, char **argv)
   receiverKeyFile = std::string(argv[2]);
 
   //check for optional argument
-  if(argc > 3)
-  {
-    serverKeyFile = std::string(argv[3]);
-  }
-  else
-  {
-    serverKeyFile = defaultServerKeyFile;
-  }
+  receiverCertFile = defaultReceiverCertFile;
+  serverCertFile = defaultServerCertFile;
 
   //no parsing for port yet
   port = defaultPort;
@@ -108,7 +113,8 @@ int ListenArgs::init(int argc, char **argv)
 void ListenArgs::usage() const
 {
   std::cerr <<
-    "usage: ./binary serverAddress receiverPrivateKey [ServerPublicKey]" <<
+    "usage: ./binary serverAddress receiverPrivateKey [receiverCertificate] "
+    "[serverCertificate] [port]" <<
     std::endl;
 }
 
@@ -142,7 +148,8 @@ int main(int argc, char **argv)
   }
 
   //stage in the authentication keys
-  if((error = authKeys.init(args.serverKeyFile, args.receiverKeyFile, rng)))
+  if((error = authKeys.init(args.serverCertFile, args.receiverCertFile,
+      args.receiverKeyFile, rng)))
   {
     std::cerr << "Failed to load authentication keys" << std::endl;
     goto fail;
