@@ -225,6 +225,8 @@ namespace Bless
    *
    * Channel::client is initialized in connect().
    *
+   * @warning calling init() twice leaks resources.
+   *
    * @param keys pointer to initialized AuthKeys to use for authentication.
    * @param server ip address of the Server in the protocol.
    * @param port UDP port to connect to the Server on.
@@ -252,6 +254,7 @@ namespace Bless
       error = -2;
       goto fail;
     }
+    connectionInfo.sin_family = AF_INET;
     connectionInfo.sin_addr = address;
 
     connectionInfo.sin_port = htons(port);
@@ -288,6 +291,15 @@ fail:
    */
   int Channel::connect(RandomNumberGenerator &rng, recvCallback cb)
   {
+    //connect the socket to the Server
+    if(::connect(connection,
+          reinterpret_cast<const sockaddr *>(&connectionInfo),
+          sizeof(connectionInfo)) == -1)
+    {
+      return -1;
+    }
+
+    //initiate the TLS connection
     client = new TLS::Client(
       [this](const byte *const data, size_t len) {
         this->send(data, len);
