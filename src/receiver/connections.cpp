@@ -96,6 +96,7 @@ namespace Bless
       std::vector<Certificate_Store *> trusted_certificate_authorities(
           const std::string &type, const std::string &context) override
       {
+        return std::vector<Certificate_Store *>();
       }
 
       /**
@@ -138,6 +139,8 @@ namespace Bless
           &certKeyTypes, const std::string &type, const std::string &context)
           override
       {
+        auto cert = authKeys->getReceiverCert();
+        return std::vector<X509_Certificate>{*cert};
       }
 
       /**
@@ -153,6 +156,11 @@ namespace Bless
       Private_Key *private_key_for(const X509_Certificate &cert,
           const std::string &type, const std::string &context) override
       {
+        //if the cert is the Receiver's, return the private key
+        if(cert == authKeys->getReceiverCert())
+        {
+          return authKeys->getReceiverPrivKey();
+        }
       }
 
       /**
