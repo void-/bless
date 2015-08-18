@@ -15,9 +15,13 @@
 /**
  * Directory path to default resources.
  */
+#ifndef RESOURCE_PATH
 #define RESOURCE_PATH "./"
+#endif //RESOURCE_PATH
 
 using namespace Bless;
+
+int getMessage(unsigned char const *const, std::size_t);
 
 /**
  * @struct ListenArgs
@@ -162,6 +166,32 @@ int main(int argc, char **argv)
     goto fail;
   }
 
+  //establish the message channel: connect to the Server
+  if((error = chan.connect(rng, getMessage)))
+  {
+    std::cerr << "Failed to connect" << std::endl;
+    goto fail;
+  }
+
 fail:
   return error;
+}
+
+/**
+ * @brief callback when a new message is received from the Sender.
+ *
+ * This follows the interface for Channel::recvCallback.
+ *
+ * @param payload message data from the Sender.
+ * @param len the length, in bytes, of \p payload.
+ * @return non-zero on error.
+ */
+int getMessage(unsigned char const *const payload, std::size_t len)
+{
+    for(size_t i = 0; i < len; ++i)
+    {
+      std::cout << payload[i];
+    }
+
+    return 0;
 }
