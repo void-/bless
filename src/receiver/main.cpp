@@ -38,7 +38,7 @@ using namespace Bless;
  * @var unsigned short ListenArgs::port
  * @brief udp port to connect to the Server on
  *
- * @var std::string ListenArgs::defaultServerKeyFile
+ * @var std::string ListenArgs::defaultServerCertFile
  * @brief default file to load the Server's certificate key from
  *
  * @var unsigned short ListenArgs::defaultPort
