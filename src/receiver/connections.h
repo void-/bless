@@ -46,7 +46,7 @@ namespace Bless
   class Channel
   {
     public:
-      typedef std::function<int (unsigned char const * const, std::size_t)>
+      typedef std::function<int (unsigned char const *const, std::size_t)>
         recvCallback;
 
       Channel();
