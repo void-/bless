@@ -311,9 +311,8 @@ fail:
   /**
    * @brief make a connection to the Server.
    *
-   * This is a blocking call, it will receive connections indenfinitely until
-   * something goes wrong, at which point connect() will return.
-   * The previous statement is inaccurate.
+   * This simply establishes the message channel; call listen() to receive
+   * data.
    *
    * @param rng RandomNumberGenerator to use for making the connection
    * @param cb receive callback called whenever a new, authenticated message is
@@ -353,8 +352,7 @@ fail:
         rng,
         *serverInformation,
         TLS::Protocol_Version::latest_dtls_version(),
-        {},
-        bufferSize);
+        {});
     }
     catch(std::bad_alloc &e)
     {

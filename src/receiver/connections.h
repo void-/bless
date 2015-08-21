@@ -55,6 +55,7 @@ namespace Bless
       int init(AuthKeys *keys, const std::string &server,
         unsigned short port);
       int connect(Botan::RandomNumberGenerator &rng, recvCallback cb);
+      int listen();
 
     protected:
       Botan::TLS::Client *client;

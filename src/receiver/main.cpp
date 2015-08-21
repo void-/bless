@@ -173,6 +173,13 @@ int main(int argc, char **argv)
     goto fail;
   }
 
+  //listen for messages from the Sender
+  if((error = chan.listen()))
+  {
+    std::cerr << "listen() failed." << std::endl;
+    goto fail;
+  }
+
 fail:
   return error;
 }
