@@ -331,23 +331,6 @@ fail:
   }
 
   /**
-   * @brief callback used by the DTLS connection to receive application data.
-   *
-   * This currently writes \p payload to stdout, but should do something more
-   * sophisticated in the future.
-   *
-   * @param payload the bytes received from the Server.
-   * @param len the length of \p payload.
-   */
-  void Channel::recv(const Botan::byte *const payload, size_t len)
-  {
-    for(size_t i = 0; i < len; ++i)
-    {
-      std::cout << payload[i];
-    }
-  }
-
-  /**
    * @brief callback when the DTLS connection receives an encryption alert.
    *
    * This silently kills the connection.
