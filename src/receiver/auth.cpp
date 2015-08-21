@@ -2,6 +2,7 @@
 
 #include <botan/data_src.h>
 #include <botan/x509_key.h>
+#include <botan/x509path.h>
 #include <botan/pkcs8.h>
 
 using namespace Botan;
@@ -47,7 +48,8 @@ namespace Bless
    * If this function fails to deserialize the inputs, the object still is not
    * valid.
    *
-   * The keys must be signing keys.
+   * The given certificates are checked for validity and must be self-signed.
+   * If init() succeeds; the certificates can be trusted.
    *
    * @param server filename for Server's X509 certificate.
    * @param recvCert filename to deserialize the Receiver's certificate from.
@@ -62,6 +64,13 @@ namespace Bless
     try
     {
       serverCert = new X509_Certificate(server);
+
+      //verify cert is self-signed and valid
+      if(!(serverCert->is_self_signed() &&
+          serverCert->check_signature(*serverCert->subject_public_key())))
+      {
+        return -10;
+      }
     }
     catch(Decoding_Error &e)
     {
@@ -80,6 +89,13 @@ namespace Bless
     try
     {
       receiverCert = new X509_Certificate(recvCert);
+
+      //verify cert is self-signed and valid
+      if(!(receiverCert->is_self_signed() &&
+          receiverCert->check_signature(*receiverCert->subject_public_key())))
+      {
+        return -11;
+      }
     }
     catch(Decoding_Error &e)
     {
