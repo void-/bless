@@ -18,16 +18,29 @@ namespace Bless
   {
     public:
       /**
-       * @brief turn DTLS heartbeats on.
+       * @brief turn DTLS heartbeats off.
        *
-       * This is critical in keeping the UDP holepunch active. Built-in
-       * heartbeat support is the key reason DTLS is used.
+       * @bug heartbeats are only client to server, which defeats the purpose.
+       * This is only useful if it could be from server to client, but is not.
        *
        * @return true.
        */
       bool negotiate_hearbeat_support() const
       {
-        return true;
+        return false;
+      }
+
+      /**
+       * @brief turn off server initiated renegotiation.
+       *
+       * The Server shouldn't be able to send any data that will require a
+       * client response.
+       *
+       * @return false.
+       */
+      bool allow_server_initiated_renegotiation() const override
+      {
+        return false;
       }
 
       /**
@@ -234,7 +247,6 @@ namespace Bless
       delete credentialsManager;
       delete serverInformation;
     }
-    //XXX: does this do an *unclean* disconnect?
     close(connection); //ignore any errors
   }
 
@@ -313,6 +325,12 @@ fail:
    *
    * This simply establishes the message channel; call listen() to receive
    * data.
+   *
+   * @todo send a maximum number of packets during connection to avoid a DOS
+   * revealing the Receiver's location.
+   *
+   * This shuts down writing to the socket, preventing the Receiver from
+   * further revealing its location.
    *
    * @param rng RandomNumberGenerator to use for making the connection
    * @param cb receive callback called whenever a new, authenticated message is
