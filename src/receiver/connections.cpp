@@ -23,7 +23,7 @@ namespace Bless
        * @bug heartbeats are only client to server, which defeats the purpose.
        * This is only useful if it could be from server to client, but is not.
        *
-       * @return true.
+       * @return false.
        */
       bool negotiate_hearbeat_support() const
       {
@@ -62,6 +62,10 @@ namespace Bless
    * @brief Manage the credentials for the message channel.
    *
    * Essentially, interface from AuthKeys to Credentials_Manager interface.
+   *
+   * @var AuthKeys *ChannelCredentials::authKeys
+   * @brief keys to authenticate the message channel; not owned by
+   *   ChannelCredentials.
    */
   class ChannelCredentials : public Credentials_Manager
   {

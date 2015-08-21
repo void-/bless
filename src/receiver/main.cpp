@@ -189,6 +189,10 @@ fail:
  *
  * This follows the interface for Channel::recvCallback.
  *
+ * XXX: Is \p payload secure memory?
+ *
+ * @todo this is the raw data from the Sender; authenticate it
+ *
  * @param payload message data from the Sender.
  * @param len the length, in bytes, of \p payload.
  * @return non-zero on error.

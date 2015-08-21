@@ -34,6 +34,29 @@ namespace Bless
    * When the Receiver shuts down, the DTLS connection will uncleanly be
    * shutdown, i.e. no finalizing packets will be sent by the Receiver.
    *
+   * @var Botan::TLS::Client *Channel::client
+   * @brief TLS client that holds state about the connection to the Server
+   *
+   * @var Botan::TLS::Policy *Channel::policy
+   * @brief the policy used when negotiating the DTLS connection
+   *
+   * @var Botan::TLS::Session_Manager *Channel::sessionManager
+   * @brief nop session manager used to manage saved DTLS sessions; does
+   *   nothing
+   *
+   * @var Botan::TLS::Credentials_Manager *Channel::credentialsManager
+   * @brief store credentials for DTLS connection; interfaces AuthKeys for DTLS
+   *
+   * @var Botan::TLS::Server_Information *Channel::serverInformation
+   * @brief information about the Server, of which there is none
+   *
+   * @var size_t Channel::bufferSize
+   * @brief the size, in bytes, used for stack-allocated buffers
+   *
+   * @var int Channel::timeout
+   * @brief the number of milliseconds to timeout at when handshaking the DTLS
+   *   connection
+   *
    * @var Channel::recvCallback
    * @brief callback when an authenticated message comes in.
    *
@@ -42,6 +65,9 @@ namespace Bless
    *
    * @var int Channel::connection
    * @brief socket descriptor for the connection to the Server.
+   *
+   * @var sockaddr_in Channel::connectionInfo
+   * @brief socket structure information about Channel::connection
    */
   class Channel
   {
