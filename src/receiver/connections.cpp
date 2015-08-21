@@ -101,23 +101,21 @@ namespace Bless
       }
 
       /**
-       * @brief return the trusted certificate authorities, i.e. the Server.
+       * @brief return no trusted certificate authorities.
        *
-       * The Server's public key will be in the form of a self-signed
-       * certificate. The Server is the only trusted CA.
+       * Self-signed certificates are used between the Server and Receiver; no
+       * certificate authorities are trusted.
        *
-       * @param type the type of operation occuring.
-       * @param context a context relative to \p type.
-       * @return a vector of trusted CAs.
+       * @return an empty vector
        */
       std::vector<Certificate_Store *> trusted_certificate_authorities(
-          const std::string &type, const std::string &context) override
+          const std::string &, const std::string &) override
       {
         return std::vector<Certificate_Store *>();
       }
 
       /**
-       * @brief verify the given certificate chain for \p hostname.
+       * @brief verify the given certificate chain.
        *
        * \p certChain should contain the Server's public key.
        *
@@ -125,12 +123,12 @@ namespace Bless
        * in AuthKeys::init().
        *
        * @param type the type of operation occuring.
-       * @param hostname the hostname claimed to belong to \p certChain.
        * @param certChain the certificate chain to verify.
-       * @throw a std::exception if its wrong.
+       * @throw std::invalid_argument if its wrong.
+       * @throw std::runtime_error if \p type is not "tls_client"
        */
       void verify_certificate_chain(const std::string &type,
-          const std::string &hostname,
+          const std::string &,
           const std::vector<X509_Certificate> &certChain) override
       {
         if(type != "tls-client")
@@ -148,23 +146,19 @@ namespace Bless
       /**
        * @brief return a certificate chain to identify the Receiver.
        *
-       * The difference between this and
-       * Credentials_Manager::cert_chain_single_type() is cert_chain() can
-       * return any type of certificate key type (algorithm) from \p
-       * certKeyTypes.
+       * This returns the Receiver's self-signed cert, regardless of the type
+       * of key requested.
        *
-       * This returns the Receiver's self-signed cert; this must be
-       * communicated, to the Server by means of some externel PKI.
+       * This must be communicated, to the Server by means of some externel
+       * PKI.
        *
-       * @param certKeyTypes vector of types of keys requested, e.g.
-       *   (RSA, ECDSA)
        * @param type the type of operation occuring
-       * @param context a context relative to \p type.
+       * @throw std::runtime_error if \p type is not "tls_client"
        * @return vector containing the self-signed certificate for the
        *   Receiver.
        */
       std::vector<X509_Certificate> cert_chain(const std::vector<std::string>
-          &certKeyTypes, const std::string &type, const std::string &context)
+          &, const std::string &type, const std::string &)
           override
       {
         if(type != "tls-client")
@@ -182,11 +176,11 @@ namespace Bless
        *
        * @param cert the certificate to yield the private key for.
        * @param type the type of operation occuring.
-       * @param context the context \p cert will be used under.
+       * @throw std::runtime_error if \p type is not "tls_client"
        * @return the private half of \p cert.
        */
       Private_Key *private_key_for(const X509_Certificate &cert,
-          const std::string &type, const std::string &context) override
+          const std::string &type, const std::string &) override
       {
         if(type != "tls-client")
         {
@@ -478,14 +472,9 @@ fail:
   /**
    * @brief callback when the DTLS connection receives an encryption alert.
    *
-   * This silently kills the connection.
-   *
-   * @param alert the alert received.
-   * @param payload not used.
-   * @param len not used.
+   * This silently kills the connection by closing the socket.
    */
-  void Channel::alert(Botan::TLS::Alert alert,
-      const Botan::byte *const, size_t)
+  void Channel::alert(Botan::TLS::Alert, const Botan::byte *const, size_t)
   {
     close(connection);
   }
