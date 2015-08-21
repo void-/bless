@@ -1,7 +1,7 @@
 #include "connections.h"
 
 #include <unistd.h>
-#include <iostream>
+#include <poll.h>
 
 using namespace Botan;
 
@@ -50,7 +50,7 @@ namespace Bless
    *
    * Essentially, interface from AuthKeys to Credentials_Manager interface.
    */
-  class ChannelCredentials : virtual Credentials_Manager
+  class ChannelCredentials : public Credentials_Manager
   {
     public:
       /**
@@ -104,6 +104,9 @@ namespace Bless
        *
        * \p certChain should contain the Server's public key.
        *
+       * If the certificate matches, it must be valid because it was verified
+       * in AuthKeys::init().
+       *
        * @param type the type of operation occuring.
        * @param hostname the hostname claimed to belong to \p certChain.
        * @param certChain the certificate chain to verify.
@@ -113,8 +116,16 @@ namespace Bless
           const std::string &hostname,
           const std::vector<X509_Certificate> &certChain) override
       {
-        Credentials_Manager::verify_certificate_chain(
-          type, hostname, certChain);
+        if(type != "tls-client")
+        {
+          throw std::runtime_error("Must use for tls-client.");
+        }
+
+        if(!(certChain.size() == 1 &&
+            certChain[0] == *authKeys->getServerCert()))
+        {
+          throw std::invalid_argument("Certificate did not match Server's.");
+        }
       }
 
       /**
@@ -139,6 +150,10 @@ namespace Bless
           &certKeyTypes, const std::string &type, const std::string &context)
           override
       {
+        if(type != "tls-client")
+        {
+          throw std::runtime_error("Must use for tls-client.");
+        }
         auto cert = authKeys->getReceiverCert();
         return std::vector<X509_Certificate>{*cert};
       }
@@ -156,11 +171,18 @@ namespace Bless
       Private_Key *private_key_for(const X509_Certificate &cert,
           const std::string &type, const std::string &context) override
       {
+        if(type != "tls-client")
+        {
+          throw std::runtime_error("Must use for tls-client.");
+        }
+
         //if the cert is the Receiver's, return the private key
-        if(cert == authKeys->getReceiverCert())
+        if(cert == *authKeys->getReceiverCert())
         {
           return authKeys->getReceiverPrivKey();
         }
+
+        return nullptr;
       }
 
       /**
@@ -264,7 +286,15 @@ namespace Bless
     {
       policy = new ChannelPolicy();
       sessionManager = new TLS::Session_Manager_Noop(); //don't keep a session
-      credentialsManager = new Botan::Credentials_Manager();
+
+      //initialize the Channel Credentials
+      auto creds = new ChannelCredentials();
+      if((error = creds->init(keys)))
+      {
+        goto fail;
+      }
+      credentialsManager = creds;
+
       serverInformation = new TLS::Server_Information();
     }
     catch(std::bad_alloc &e)
@@ -283,6 +313,7 @@ fail:
    *
    * This is a blocking call, it will receive connections indenfinitely until
    * something goes wrong, at which point connect() will return.
+   * The previous statement is inaccurate.
    *
    * @param rng RandomNumberGenerator to use for making the connection
    * @param cb receive callback called whenever a new, authenticated message is
@@ -291,6 +322,9 @@ fail:
    */
   int Channel::connect(RandomNumberGenerator &rng, recvCallback cb)
   {
+    ::pollfd pollSocket;
+    unsigned char readBuffer[bufferSize];
+
     //connect the socket to the Server
     if(::connect(connection,
           reinterpret_cast<const sockaddr *>(&connectionInfo),
@@ -300,27 +334,106 @@ fail:
     }
 
     //initiate the TLS connection
-    client = new TLS::Client(
-      [this](const byte *const data, size_t len) {
-        this->send(data, len);
-      },
-      cb,
-      [this](TLS::Alert alert_, const byte *const data, size_t len) {
-        this->alert(alert_, data, len);
-      },
-      [this](const TLS::Session &session) {
-        return this->handshake(session);
-      },
-      *sessionManager,
-      *credentialsManager,
-      *policy,
-      rng,
-      *serverInformation,
-      TLS::Protocol_Version::latest_dtls_version(),
-      {},
-      bufferSize);
+    try
+    {
+      client = new TLS::Client(
+        [this](const byte *const data, size_t len) {
+          this->send(data, len);
+        },
+        cb,
+        [this](TLS::Alert alert_, const byte *const data, size_t len) {
+          this->alert(alert_, data, len);
+        },
+        [this](const TLS::Session &session) {
+          return this->handshake(session);
+        },
+        *sessionManager,
+        *credentialsManager,
+        *policy,
+        rng,
+        *serverInformation,
+        TLS::Protocol_Version::latest_dtls_version(),
+        {},
+        bufferSize);
+    }
+    catch(std::bad_alloc &e)
+    {
+      //couldn't allocate new client
+      return -1;
+    }
+
+    //set up socket for polling
+    pollSocket.fd = connection;
+    pollSocket.events = POLLIN; //poll for reading
+
+    //while the channel is down, try to read a response
+    //XXX: This is privacy critical; each packet sent reveals our location
+    while(!client->is_active())
+    {
+      //not ready after 1 second
+      if(::poll(&pollSocket, 1u, timeout) != 1)
+      {
+        return -2;
+      }
+
+      //error on socket
+      if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
+          (pollSocket.revents & POLLNVAL))
+      {
+        return pollSocket.revents;
+      }
+
+      //must be ready to read
+      ssize_t count = read(connection, readBuffer, sizeof(readBuffer));
+
+      if(count <= 0)
+      {
+        //poll() lied!
+        return -3;
+      }
+
+      //give read data to client
+      client->received_data(readBuffer, count);
+    }
+
+    //prevent the receiver from writing any more bytes
+    ::shutdown(connection, SHUT_WR);
 
     return 0;
+  }
+
+  /**
+   * @brief listen for new messages from the Server.
+   *
+   * This blocks until an error occurs.
+   *
+   * Raw messages from the Sender will be presented to the callback function
+   * registered in connect().
+   *
+   * @return a failure code; listen() returns when it fails.
+   */
+  int Channel::listen()
+  {
+    unsigned char readBuffer[bufferSize];
+
+    //read while client is still up
+    while(client->is_active())
+    {
+      //block until bytes are ready to read
+      ssize_t count = read(connection, readBuffer, sizeof(readBuffer));
+
+      //check if read failed
+      if(count <= 0)
+      {
+        return -1;
+      }
+
+      //give read data to client
+      client->received_data(readBuffer, count);
+    }
+
+    //failed somehow
+    return -2;
   }
 
   /**
@@ -352,9 +465,8 @@ fail:
    * @param len not used.
    */
   void Channel::alert(Botan::TLS::Alert alert,
-      const Botan::byte *const payload, size_t len)
+      const Botan::byte *const, size_t)
   {
-    std::cout << alert.type_string();
     close(connection);
   }
 
@@ -364,10 +476,10 @@ fail:
    * This is called when the message channel is established.
    *
    * @param session not used.
-   * @return true.
+   * @return false: don't cache the session
    */
-  bool Channel::handshake(const Botan::TLS::Session &session)
+  bool Channel::handshake(const Botan::TLS::Session &)
   {
-    return true;
+    return false;
   }
 }

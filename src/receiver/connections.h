@@ -68,6 +68,7 @@ namespace Bless
       bool handshake(const Botan::TLS::Session &session);
 
       static const size_t bufferSize = 4096;
+      static const int timeout = 1000;
     private:
       AuthKeys *authKeys;
       int connection;
