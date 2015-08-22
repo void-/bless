@@ -34,6 +34,23 @@ namespace Bless
    * When the Receiver shuts down, the DTLS connection will uncleanly be
    * shutdown, i.e. no finalizing packets will be sent by the Receiver.
    *
+   * Call init(), connect(), then listen().
+   *
+   * Example:<p>
+   * @code
+   * Channel chan;
+   * AuthKeys keys;
+   * Botan::RandomNumberGenerator rng;
+   * Channel::recvCallback cb = [](unsigned char const *const data, size_t n) {
+   *   //do something with n bytes of data from Sender
+   * }
+   * //...initialize keys and rng
+   *
+   * chan.init(&keys, "127.0.0.1", 8675); //initialized message channel
+   * chan.connect(rng, cb); //establish a connection to 127.0.0.1:8675 udp
+   * chan.listen(); //block and listen for messages from the Server/Sender
+   * @endcode
+   *
    * @var Botan::TLS::Client *Channel::client
    * @brief TLS client that holds state about the connection to the Server
    *
