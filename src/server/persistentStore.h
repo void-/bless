@@ -9,9 +9,41 @@
 #define PERSISTENT_STORE_H
 
 #include <condition_variable>
+#include <list>
 
 namespace Bless
 {
+  /**
+   * @class KeyStore
+   * @brief interface to disk for Sender certificates.
+   */
+  class KeyStore
+  {
+  };
+
+  /**
+   * @class MessageStore
+   * @brief interface to disk for durably stored Messages.
+   *
+   * @tparam M the type of messages stored
+   *
+   * @var std::list<M> MessageStore::stagedIn
+   * @brief stored messages, in memory, staged in from disk
+   */
+  template <class M>
+  class MessageStore
+  {
+    public:
+      int init();
+      int append(M msg);
+
+      typename std::list<M>::iterator begin();
+      typename std::list<M>::iterator end();
+
+    private:
+      std::list<M> stagedIn;
+  };
+
   /**
    * @class MessageQueue
    * @brief stores Messages in memory and persistently.
@@ -35,7 +67,7 @@ namespace Bless
    * @brief condition variable corresponding to realTimeLock. Use this to
    *   signal when a new realtime message is available.
    */
-  template<class M, class Q>
+  template <class M, class Q>
   class MessageQueue
   {
     public:
@@ -52,6 +84,7 @@ namespace Bless
 
     private:
       Q realTime;
+      MessageStore<M> backendStore;
   };
 }
 
