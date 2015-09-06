@@ -7,11 +7,11 @@ RM = rm -f
 
 all: main
 
-auth.o: auth.cpp auth.h
+authKeys.o: authKeys.cpp authKeys.h
 connections.o: connections.cpp connections.h
 persistentStore.o: persistentStore.cpp persistentStore.h
-main: auth.o connections.o
-	$(CXX) $(CPPFLAGS) main.cpp auth.o connections.o persistenStore.o \
+main: authKeys.o connections.o persistentStore.o
+	$(CXX) $(CPPFLAGS) main.cpp authKeys.o connections.o persistentStore.o \
 	$(LDFLAGS) -o $(BIN)
 
 .PHONY: clean
