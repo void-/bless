@@ -25,54 +25,47 @@ namespace Bless
    * @class MessageStore
    * @brief interface to disk for durably stored Messages.
    *
-   * @tparam M the type of messages stored
+   * Derive from this class to interface to an actual storage device.
    *
-   * @var std::list<M> MessageStore::stagedIn
-   * @brief stored messages, in memory, staged in from disk
+   * @tparam M the type of messages stored
    */
   template <class M>
   class MessageStore
   {
     public:
-      int init();
-      int append(M msg);
+      virtual int append(M msg) = 0;
 
-      typename std::list<M>::iterator begin();
-      typename std::list<M>::iterator end();
-
-    private:
-      std::list<M> stagedIn;
+      virtual M &next() = 0;
+      virtual bool end() = 0;
   };
 
   /**
    * @class MessageQueue
    * @brief stores Messages in memory and persistently.
    *
-   * This has two key datastructures: a realtime message structure and old
-   * message structure. Realtime messages are those sent recently from Senders,
-   * old messages are loaded from disk and, presumably, weren't delivered since
-   * the last crash.
+   * MessageQueue will iterate over messages using next(). Messages are of two
+   * types:<p>
+   * - realtime (added with addMessage())
+   * - old (staged in from disk)
+   * </p>
    *
-   * @tparam M the type of messages stored, used for parameters to addMessage()
-   * @tparam Q realtime message structure type, e.g. std::vector
+   * next() will yield all real time messages until it runs out. It then yields
+   * all messages from disk and when those run out, finally a dummy message.
    *
-   * @var Q MessageQueue::realTime
-   * @brief realtime message structure that holds messages receiver from a
-   *   Sender in the current session.
+   * @tparam M the type of messages stored, used for parameter to addMessage()
    *
    * @var std::mutex MessageQueue::realTimeLock
-   * @brief lock to realTime structure for adding/removing messages.
+   * @brief lock to messageReady.
    *
    * @var std::condition_variable MessageQueue::messageReady
-   * @brief condition variable corresponding to realTimeLock. Use this to
-   *   signal when a new realtime message is available.
+   * @brief condition variable corresponding to realTimeLock. This is used to
+   *   signal when a new realtime message is available via next().
    */
-  template <class M, class Q>
+  template <class M>
   class MessageQueue
   {
     public:
-      MessageQueue();
-      ~MessageQueue();
+      virtual ~MessageQueue() = 0;
 
       int init();
       int addMessage(M msg);
@@ -81,10 +74,6 @@ namespace Bless
 
       std::mutex realTimeLock;
       std::condition_variable messageReady;
-
-    private:
-      Q realTime;
-      MessageStore<M> backendStore;
   };
 }
 
