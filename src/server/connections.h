@@ -22,6 +22,29 @@
 namespace Bless
 {
   /**
+   * @class Runnable
+   * @brief interface for a concurrent context.
+   *
+   * Subclass and override run() to do something on a separate thread. Call
+   * start() to begin execution.
+   *
+   * This allows for dividing initialization and execution.
+   */
+  class Runnable
+  {
+    public:
+      Runneable() = delete;
+      Runnable(const Runnable &) = delete;
+
+      int start() final;
+
+    protected:
+      virtual void run() = 0;
+
+      std::thread t;
+  };
+
+  /**
    * @class Channel
    * @brief abstract, secure channel between two parties in the protocol.
    *
@@ -47,12 +70,7 @@ namespace Bless
       virtual ~Channel();
       int init(int socket, sockaddr_in sender);
 
-      int start() final;
-
     protected:
-      virtual void run() = 0;
-
-      std::thread t;
       int connection;
       Botan::TLS::Server *server;
   };
@@ -69,7 +87,7 @@ namespace Bless
    * allocated on a controlling thread, but run() should be called on a
    * separate thread; hence run() is not static.
    */
-  class ReceiverChannel : Channel
+  class ReceiverChannel : Channel, Runnable
   {
     public:
       ReceiverChannel();
@@ -78,6 +96,27 @@ namespace Bless
 
     protected:
       void run() override;
+  };
+
+  /**
+   * @class ReceiverMain
+   * @brief main class for handling a changing connection to the Receiver.
+   *
+   * Don't subclass Runnable so that the main thread can execute this.
+   */
+  template <class M>
+  class ReceiverMain
+  {
+    public:
+      ReceiverMain(MessageQueue<M> &queue_);
+      ~ReceiverMain();
+
+      int init();
+      int start();
+
+    private:
+      MessageQueue<M> &queue;
+      ReceiverChannel chan;
   };
 
   /**
@@ -90,7 +129,7 @@ namespace Bless
    * @tparam M the type of message \p queue should store.
    */
   template <class M>
-  class SenderMain : Channel
+  class SenderMain : Runnable
   {
     SenderMain(MessageQueue<M> &queue_);
     ~SenderMain();
