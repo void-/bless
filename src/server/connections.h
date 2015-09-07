@@ -7,6 +7,8 @@
 #ifndef CONNECTIONS_H
 #define CONNECTIONS_H
 
+#include "persistentStore.h"
+
 #include <sys/types.h>
 #include <sys/unistd.h>
 #include <sys/socket.h>
@@ -48,14 +50,19 @@ namespace Bless
    * This represents a connection to the Receiver regardless of whether the
    * message channel is stale or not. When a new address of the Receiver is
    * known, this can be updated, by init(), with the new information.
+   *
+   * There should only be one instance of ReceiverChannel. It should be
+   * allocated on a controlling thread, but run() should be called on a
+   * separate thread; hence run() is not static.
    */
   class ReceiverChannel : Channel
   {
     public:
       ReceiverChannel();
       ~ReceiverChannel();
-
       int init(int socket, sockaddr_in receiver);
+
+      void run();
   };
 
   /**
@@ -76,7 +83,12 @@ namespace Bless
       ~SenderChannel();
 
       int init(int socket, sockaddr_in sender);
+
+      static void run(int socket, sockaddr_in receiver);
   };
+
+  template <class M>
+  void senderMain(MessageQueue<M> &queue);
 }
 
 #endif //CONNECTIONS_H

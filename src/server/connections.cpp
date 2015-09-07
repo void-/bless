@@ -31,4 +31,18 @@ namespace Bless
   {
     return 0;
   }
+
+  /**
+   * @brief main function for handling connections to the Sender.
+   *
+   * This should run on its own thread and will create many threads to handle
+   * individual connections.
+   *
+   * @tparam M the type of message \p queue should store.
+   * @param queue message queue to write Sender-sent messages to.
+   */
+  template <class M>
+  void senderMain(MessageQueue<M> &queue)
+  {
+  }
 }
