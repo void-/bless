@@ -9,11 +9,12 @@ namespace Bless
    * the Receiver.
    *
    * @param sock udp socket the Receiver has connected to.
+   * @param receiver socket information about \p sock.
    * @return non-zero on failure.
    */
-  int ReceiverChannel::init(int sock)
+  int ReceiverChannel::init(int socket, sockaddr_in receiver)
   {
-
+    return 0;
   }
 
   /**
@@ -28,6 +29,6 @@ namespace Bless
    */
   int SenderChannel::init(int sock, sockaddr_in sender)
   {
-
+    return 0;
   }
 }

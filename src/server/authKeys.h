@@ -31,7 +31,6 @@ namespace Bless
   class ConnectionKey
   {
     public:
-      ConnectionKey();
       virtual ~ConnectionKey();
       virtual int init(KeyStore &store) = 0;
     protected:
@@ -42,9 +41,10 @@ namespace Bless
    * @class CounterpartyKey
    * @brief holds the certificate of either the Sender or Receiver.
    */
-  class CounterpartyKey : ConnectionKey
+  class CounterpartyKey : public ConnectionKey
   {
     public:
+      ~CounterpartyKey() override;
       int init(KeyStore &store) override;
   };
 
@@ -59,7 +59,7 @@ namespace Bless
    * @var Botan::Private_Key *receiverPrivKey
    * @brief private key for the Server.
    */
-  class ServerKey : ConnectionKey
+  class ServerKey : public ConnectionKey
   {
     public:
       ~ServerKey() override;

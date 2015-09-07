@@ -7,6 +7,13 @@
 #ifndef CONNECTIONS_H
 #define CONNECTIONS_H
 
+#include <sys/types.h>
+#include <sys/unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <botan/tls_server.h>
+
 namespace Bless
 {
   /**
@@ -48,7 +55,7 @@ namespace Bless
       ReceiverChannel();
       ~ReceiverChannel();
 
-      int init(int socket, sockaddr_in sender) override;
+      int init(int socket, sockaddr_in receiver);
   };
 
   /**
@@ -68,7 +75,7 @@ namespace Bless
       SenderChannel();
       ~SenderChannel();
 
-      int init(int socket, sockaddr_in sender) override;
+      int init(int socket, sockaddr_in sender);
   };
 }
 
