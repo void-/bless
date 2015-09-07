@@ -9,7 +9,7 @@
 #define PERSISTENT_STORE_H
 
 #include <condition_variable>
-#include <list>
+#include <queue>
 
 namespace Bless
 {
@@ -41,7 +41,7 @@ namespace Bless
 
   /**
    * @class MessageQueue
-   * @brief stores Messages in memory and persistently.
+   * @brief stores realtime and persistent Messages.
    *
    * MessageQueue will iterate over messages using next(). Messages are of two
    * types:<p>
@@ -67,13 +67,66 @@ namespace Bless
     public:
       virtual ~MessageQueue() = 0;
 
-      int init();
-      int addMessage(M msg);
-      size_t realTimeSize() const noexcept;
-      M &next();
+      /**
+       * @brief write a message to disk and take ownership.
+       *
+       * When addMessage() returns, \p msg has been written to disk and \p msg
+       * will be available via next().
+       *
+       * realTimeLock will be acquired and messageReady will be signaled.
+       *
+       * @param msg the message to write; addMessage() takes ownership.
+       * @return non-zero on failure.
+       */
+      virtual int addMessage(M msg) = 0;
+
+      /**
+       * @brief return the number of realtime messages available via next().
+       *
+       * This can be used to know how many times next() must be called to
+       * exhaust all realtime messages.
+       *
+       * This is the condition for messageReady.
+       *
+       * @return the size of the structure holding realtime messages.
+       */
+      virtual size_t realTimeSize() const noexcept = 0;
+
+      /**
+       * @brief return the next message from the message queue.
+       *
+       * All realtime messages added via addMessage() will be returned before
+       * any old messages from disk. When all messages of both types are
+       * returned, a dummy message will be returned instead.
+       *
+       * This gives ownership of the message to the caller.
+       *
+       * @return the next message in the queue, giving ownership to the caller.
+       */
+      virtual M next() = 0;
 
       std::mutex realTimeLock;
       std::condition_variable messageReady;
+  };
+
+  /**
+   * @class InMemoryMessageQueue
+   * @brief implementation of MessageQueue that only stores message in memory
+   *
+   * @tparam M the type of Message to store.
+   */
+  template <class M>
+  class InMemoryMessageQueue : public MessageQueue<M>
+  {
+    public:
+      ~InMemoryMessageQueue() override;
+
+      int addMessage(M msg) override;
+      size_t realTimeSize() const noexcept override;
+      M next() override;
+
+    private:
+      std::queue<M> realTimeMessages;
   };
 }
 
