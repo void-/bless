@@ -68,7 +68,7 @@ namespace Bless
     public:
       Channel() = delete;
       virtual ~Channel();
-      int init(int socket, sockaddr_in sender);
+      int init(int socket, sockaddr_in addr);
 
     protected:
       int connection;
@@ -90,7 +90,7 @@ namespace Bless
   class ReceiverChannel : public Channel, public Runnable
   {
     public:
-      ReceiverChannel();
+      ReceiverChannel() = default;
       ~ReceiverChannel();
       int init(int socket, sockaddr_in receiver);
 
@@ -133,7 +133,7 @@ namespace Bless
   class SenderChannel : public Channel, public Runnable
   {
     public:
-      SenderChannel();
+      SenderChannel() = default;
       ~SenderChannel();
 
       int init(int socket, sockaddr_in sender);
