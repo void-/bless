@@ -33,10 +33,10 @@ namespace Bless
   class Runnable
   {
     public:
-      Runneable() = delete;
+      Runnable() = delete;
       Runnable(const Runnable &) = delete;
 
-      int start() final;
+      int start();
 
     protected:
       virtual void run() = 0;
@@ -87,7 +87,7 @@ namespace Bless
    * allocated on a controlling thread, but run() should be called on a
    * separate thread; hence run() is not static.
    */
-  class ReceiverChannel : Channel, Runnable
+  class ReceiverChannel : public Channel, public Runnable
   {
     public:
       ReceiverChannel();
@@ -120,29 +120,6 @@ namespace Bless
   };
 
   /**
-   * @class SenderMain
-   * @brief main class for handling connections to the Sender.
-   *
-   * This should run on its own thread and will create many threads to handle
-   * individual connections.
-   *
-   * @tparam M the type of message \p queue should store.
-   */
-  template <class M>
-  class SenderMain : Runnable
-  {
-    SenderMain(MessageQueue<M> &queue_);
-    ~SenderMain();
-
-    protected:
-      void run() override;
-
-    private:
-      MessageQueue<M> &queue;
-      std::list<SenderChannel> channels;
-  };
-
-  /**
    * @class SenderChannel
    * @brief store state for the connection to a Sender; this should run on its
    *   own thread.
@@ -153,7 +130,7 @@ namespace Bless
    * @var sockaddr_in SenderChannel::senderAddress
    * @brief address of the Sender in this connection
    */
-  class SenderChannel : Channel
+  class SenderChannel : public Channel, public Runnable
   {
     public:
       SenderChannel();
@@ -163,6 +140,30 @@ namespace Bless
 
     protected:
       void run() override;
+  };
+
+  /**
+   * @class SenderMain
+   * @brief main class for handling connections to the Sender.
+   *
+   * This should run on its own thread and will create many threads to handle
+   * individual connections.
+   *
+   * @tparam M the type of message \p queue should store.
+   */
+  template <class M>
+  class SenderMain : public Runnable
+  {
+    public:
+      SenderMain(MessageQueue<M> &queue_);
+      ~SenderMain();
+
+    protected:
+      void run() override;
+
+    private:
+      MessageQueue<M> &queue;
+      std::list<SenderChannel> channels;
   };
 }
 
