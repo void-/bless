@@ -59,6 +59,35 @@ namespace Bless
   }
 
   /**
+   * @brief construct a new Receiver Main Thread given a shared MessageQueue.
+   *
+   * The reason this construct take \p queue_ as a parameter is to emphasize
+   * that this does not own the queue. It shares it and the queue's lifecycle
+   * encompasses this.
+   *
+   * This will create its own thread via ReceiverMain::chan.
+   *
+   * @tparam M the type of message \p queue should store.
+   * @param queue_ the message queue to receive messages on from the Sender.
+   */
+  template <class M>
+  ReceiverMain<M>::ReceiverMain(MessageQueue<M> &queue_) : queue(queue_)
+  {
+  }
+
+  /**
+   * @brief destruct a Receiver Main Thread.
+   *
+   * This will close the connection to the Receiver.
+   *
+   * @tparam M the type of message \p queue should store.
+   */
+  template <class M>
+  ReceiverMain<M>::~ReceiverMain()
+  {
+  }
+
+  /**
    * @brief initialize a ReceiverMain.
    *
    * @tparam M the type of message \p queue should store.
