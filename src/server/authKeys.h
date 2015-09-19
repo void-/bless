@@ -33,6 +33,8 @@ namespace Bless
     public:
       virtual ~ConnectionKey();
       virtual int init(KeyStore &store) = 0;
+
+      Botan::X509_Certificate const *getCert();
     protected:
       Botan::X509_Certificate const *cert;
   };
@@ -65,8 +67,10 @@ namespace Bless
       ~ServerKey() override;
       int init(KeyStore &store) override;
 
+      Botan::Private_Key const *getPrivKey();
+
     private:
-      Botan::Private_Key *receiverPrivKey;
+      Botan::Private_Key *privKey;
   };
 }
 
