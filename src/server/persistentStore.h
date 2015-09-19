@@ -8,6 +8,8 @@
 #ifndef PERSISTENT_STORE_H
 #define PERSISTENT_STORE_H
 
+#include <bless/message.h>
+
 #include <condition_variable>
 #include <queue>
 
@@ -25,17 +27,18 @@ namespace Bless
    * @class MessageStore
    * @brief interface to disk for durably stored Messages.
    *
-   * Derive from this class to interface to an actual storage device.
+   * Derive from this class to interface to an actual storage device, i.e.
+   * disk, main memory, nvram, etc.
    *
-   * @tparam M the type of messages stored
+   * This interface can be used by a MessageQueue to facilitate storing
+   * persistent messages.
    */
-  template <class M>
   class MessageStore
   {
     public:
-      virtual int append(M msg) = 0;
+      virtual int append(Message msg) = 0;
 
-      virtual M &next() = 0;
+      virtual Message &next() = 0;
       virtual bool end() = 0;
   };
 
@@ -52,8 +55,6 @@ namespace Bless
    * next() will yield all real time messages until it runs out. It then yields
    * all messages from disk and when those run out, finally a dummy message.
    *
-   * @tparam M the type of messages stored, used for parameter to addMessage()
-   *
    * @var std::mutex MessageQueue::realTimeLock
    * @brief lock to messageReady.
    *
@@ -61,11 +62,10 @@ namespace Bless
    * @brief condition variable corresponding to realTimeLock. This is used to
    *   signal when a new realtime message is available via next().
    */
-  template <class M>
   class MessageQueue
   {
     public:
-      virtual ~MessageQueue() = 0;
+      virtual ~MessageQueue();
 
       /**
        * @brief write a message to disk and take ownership.
@@ -78,7 +78,7 @@ namespace Bless
        * @param msg the message to write; addMessage() takes ownership.
        * @return non-zero on failure.
        */
-      virtual int addMessage(M msg) = 0;
+      virtual int addMessage(Message msg) = 0;
 
       /**
        * @brief return the number of realtime messages available via next().
@@ -103,7 +103,7 @@ namespace Bless
        *
        * @return the next message in the queue, giving ownership to the caller.
        */
-      virtual M next() = 0;
+      virtual Message next() = 0;
 
       std::mutex realTimeLock;
       std::condition_variable messageReady;
@@ -112,21 +112,18 @@ namespace Bless
   /**
    * @class InMemoryMessageQueue
    * @brief implementation of MessageQueue that only stores message in memory
-   *
-   * @tparam M the type of Message to store.
    */
-  template <class M>
-  class InMemoryMessageQueue : public MessageQueue<M>
+  class InMemoryMessageQueue : public MessageQueue
   {
     public:
       ~InMemoryMessageQueue() override;
 
-      int addMessage(M msg) override;
+      int addMessage(Message msg) override;
       size_t realTimeSize() const noexcept override;
-      M next() override;
+      Message next() override;
 
     private:
-      std::queue<M> realTimeMessages;
+      std::queue<Message> realTimeMessages;
   };
 }
 

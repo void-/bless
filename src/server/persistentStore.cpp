@@ -3,12 +3,18 @@
 namespace Bless
 {
   /**
+   * @brief destruct a MessageQueue and all its owned resources.
+   */
+  MessageQueue::~MessageQueue()
+  {
+  }
+
+  /**
    * @brief destruct the MessageQueue.
    *
    * Nothing to do because nothing is dynamically allocated.
    */
-  template <class M>
-  InMemoryMessageQueue<M>::~InMemoryMessageQueue()
+  InMemoryMessageQueue::~InMemoryMessageQueue()
   {
   }
 
@@ -20,11 +26,10 @@ namespace Bless
    * @param msg the message to enqueue and take ownership of.
    * @return non-zero on failure.
    */
-  template <class M>
-  int InMemoryMessageQueue<M>::addMessage(M msg)
+  int InMemoryMessageQueue::addMessage(Message msg)
   {
-    realTimeMessages.emplace_back(msg);
-    MessageQueue<M>::messageReady.notify_one();
+    realTimeMessages.emplace(msg);
+    MessageQueue::messageReady.notify_one();
 
     return 0;
   }
@@ -34,8 +39,7 @@ namespace Bless
    *
    * @return the number of messages in realTimeMessages.
    */
-  template <class M>
-  size_t InMemoryMessageQueue<M>::realTimeSize() const noexcept
+  size_t InMemoryMessageQueue::realTimeSize() const noexcept
   {
     return realTimeMessages.size();
   }
@@ -44,20 +48,19 @@ namespace Bless
    * @brief return the next realtime message.
    *
    * If the underlying queue of messages is empty, a new, dummy message is
-   * returned by calling the M constructor.
+   * returned by calling the Message constructor.
    *
    * @return the next message or a dummy message, giving ownership to the
    *   caller.
    */
-  template <class M>
-  M InMemoryMessageQueue<M>::next()
+  Message InMemoryMessageQueue::next()
   {
     //no realtime messages left, return a dummy
     if(!realTimeSize())
     {
-      return M();
+      return Message();
     }
-    M ret = realTimeMessages.front();
+    Message ret = realTimeMessages.front();
     realTimeMessages.pop();
     return std::move(ret);
   }
