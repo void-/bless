@@ -14,15 +14,33 @@ namespace Bless
   }
 
   /**
+   * @brief destruct a Channel and all its owned resources.
+   */
+  Channel::~Channel()
+  {
+  }
+
+  /**
    * @brief base implementation for initializing a Channel.
    *
    * Use this in subclasses of channel to avoid repeated lines.
    *
    * @param socket the socket descriptor for the connection.
    * @param addr the address of the counterparty.
+   * @param server ServerKey containing the Server's certificate and private
+   *   key.
    * @return non-zero on failure.
    */
-  int Channel::init(int socket, sockaddr_in addr)
+  int Channel::init(int socket, sockaddr_in addr, ServerKey *server)
+  {
+  }
+
+  /**
+   * @brief construct a ReceiverChannel.
+   *
+   * @warning this is invalid until init() is called.
+   */
+  ReceiverChannel::ReceiverChannel()
   {
   }
 
@@ -41,9 +59,11 @@ namespace Bless
    *
    * @param sock udp socket the Receiver has connected to.
    * @param receiver socket information about \p sock.
+   * @param client ConectionKey containing the Receiver's certificate.
    * @return non-zero on failure.
    */
-  int ReceiverChannel::init(int socket, sockaddr_in receiver)
+  int ReceiverChannel::init(int socket, sockaddr_in addr,
+      ConnectionKey *receiver, ServerKey *server)
   {
     return 0;
   }
@@ -67,11 +87,9 @@ namespace Bless
    *
    * This will create its own thread via ReceiverMain::chan.
    *
-   * @tparam M the type of message \p queue should store.
    * @param queue_ the message queue to receive messages on from the Sender.
    */
-  template <class M>
-  ReceiverMain<M>::ReceiverMain(MessageQueue<M> &queue_) : queue(queue_)
+  ReceiverMain::ReceiverMain(MessageQueue &queue_) : queue(queue_)
   {
   }
 
@@ -79,22 +97,17 @@ namespace Bless
    * @brief destruct a Receiver Main Thread.
    *
    * This will close the connection to the Receiver.
-   *
-   * @tparam M the type of message \p queue should store.
    */
-  template <class M>
-  ReceiverMain<M>::~ReceiverMain()
+  ReceiverMain::~ReceiverMain()
   {
   }
 
   /**
    * @brief initialize a ReceiverMain.
    *
-   * @tparam M the type of message \p queue should store.
    * @return non-zero on failure.
    */
-  template <class M>
-  int ReceiverMain<M>::init()
+  int ReceiverMain::init()
   {
   }
 
@@ -105,11 +118,18 @@ namespace Bless
    * main thread. Subclass Runnable and rename this function to run() if this
    * is not the desired behaviour.
    *
-   * @tparam M the type of message \p queue should store.
    * @return non-zero on failure.
    */
-  template <class M>
-  int ReceiverMain<M>::start()
+  int ReceiverMain::start()
+  {
+  }
+
+  /**
+   * @brief construct a SenderChannel.
+   *
+   * @warning this isn't valid until init() is called.
+   */
+  SenderChannel::SenderChannel()
   {
   }
 
@@ -128,9 +148,11 @@ namespace Bless
    *
    * @param sock opened socket for a tcp connection to a Sender.
    * @param sender socket information about \p sock.
+   * @param server contains certificate of the Server, SenderChannel does not
+   *   own this.
    * @return non-zero on failure.
    */
-  int SenderChannel::init(int sock, sockaddr_in sender)
+  int SenderChannel::init(int sock, sockaddr_in sender, ServerKey *server)
   {
     return 0;
   }
@@ -148,29 +170,23 @@ namespace Bless
    * This should run on its own thread and will create many threads to handle
    * individual connections.
    *
-   * @tparam M the type of message \p queue should store.
    * @param queue message queue to write Sender-sent messages to.
    */
-  template <class M>
-  SenderMain<M>::SenderMain(MessageQueue<M> &queue_) : queue(queue_)
+  SenderMain::SenderMain(MessageQueue &queue_) : queue(queue_)
   {
   }
 
   /**
    * @brief deallocate the Sender main thread and kill any threads its created.
    */
-  template <class M>
-  SenderMain<M>::~SenderMain()
+  SenderMain::~SenderMain()
   {
   }
 
   /**
    * @brief perform the main logic of receiving connections from Senders.
-   *
-   * @tparam M the type of message \p queue should store.
    */
-  template <class M>
-  void SenderMain<M>::run()
+  void SenderMain::run()
   {
   }
 }

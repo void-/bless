@@ -8,6 +8,7 @@
 #define CONNECTIONS_H
 
 #include "persistentStore.h"
+#include "authKeys.h"
 
 #include <sys/types.h>
 #include <sys/unistd.h>
@@ -33,12 +34,12 @@ namespace Bless
   class Runnable
   {
     public:
-      Runnable() = delete;
       Runnable(const Runnable &) = delete;
 
       int start();
 
     protected:
+      Runnable() = default;
       virtual void run() = 0;
 
       std::thread t;
@@ -49,13 +50,7 @@ namespace Bless
    * @brief abstract, secure channel between two parties in the protocol.
    *
    * The Server always acts as a server; it never needs to store client
-   * information.
-   *
-   * A Channel is meant to run on a separate thread, call start() to create a
-   * separate thread.
-   *
-   * @var std::thread Channel::t
-   * @brief the thread the Channel will run on.
+   * information aside from the client's expected certificate.
    *
    * @var int Channel::connection
    * @brief socket descriptor for the connection.
@@ -66,13 +61,15 @@ namespace Bless
   class Channel
   {
     public:
-      Channel() = delete;
+      Channel(const Channel &) = delete;
       virtual ~Channel();
-      int init(int socket, sockaddr_in addr);
+      int init(int socket, sockaddr_in addr, ServerKey *server);
 
     protected:
+      Channel() = default;
       int connection;
       Botan::TLS::Server *server;
+      ServerKey *serverKey;
   };
 
   /**
@@ -84,38 +81,43 @@ namespace Bless
    * known, this can be updated, by init(), with the new information.
    *
    * There should only be one instance of ReceiverChannel. It should be
-   * allocated on a controlling thread, but run() should be called on a
-   * separate thread; hence run() is not static.
+   * allocated on a controlling thread.
+   *
+   * @var ConnectionKey *ReceiverChannel::clientKey
+   * @brief ConnectionKey containing the expected certificate for the Receiver.
    */
   class ReceiverChannel : public Channel, public Runnable
   {
     public:
-      ReceiverChannel() = default;
+      ReceiverChannel();
       ~ReceiverChannel();
-      int init(int socket, sockaddr_in receiver);
+      int init(int socket, sockaddr_in addr, ConnectionKey *receiver,
+        ServerKey *server);
 
     protected:
       void run() override;
+      ConnectionKey *receiverKey;
   };
 
   /**
    * @class ReceiverMain
    * @brief main class for handling a changing connection to the Receiver.
    *
-   * Don't subclass Runnable so that the main thread can execute this.
+   * Don't subclass Runnable so that the main thread can execute this. This is
+   * done to prevent main from doing nothing and instead have it execute as
+   * ReceiverMain.
    */
-  template <class M>
   class ReceiverMain
   {
     public:
-      ReceiverMain(MessageQueue<M> &queue_);
+      ReceiverMain(MessageQueue &queue_);
       ~ReceiverMain();
 
       int init();
       int start();
 
     private:
-      MessageQueue<M> &queue;
+      MessageQueue &queue;
       ReceiverChannel chan;
   };
 
@@ -127,16 +129,23 @@ namespace Bless
    * This keeps the state per instance of a connection to the Sender. The
    * lifecycle of this object should be the same as the connection itself.
    *
+   * The use idea is:
+   * - A new connection is available
+   * - Allocate a SenderChannel
+   * - init() the SenderChannel with a socket
+   * - call start() to handle the connection on a separate thread
+   * - The SenderChannel will complete the connection and deallocate itself
+   *
    * @var sockaddr_in SenderChannel::senderAddress
    * @brief address of the Sender in this connection
    */
   class SenderChannel : public Channel, public Runnable
   {
     public:
-      SenderChannel() = default;
+      SenderChannel();
       ~SenderChannel();
 
-      int init(int socket, sockaddr_in sender);
+      int init(int socket, sockaddr_in sender, ServerKey *server);
 
     protected:
       void run() override;
@@ -148,23 +157,19 @@ namespace Bless
    *
    * This should run on its own thread and will create many threads to handle
    * individual connections.
-   *
-   * @tparam M the type of message \p queue should store.
    */
-  template <class M>
   class SenderMain : public Runnable
   {
     public:
-      SenderMain(MessageQueue<M> &queue_);
+      SenderMain(MessageQueue &queue_);
       ~SenderMain();
 
     protected:
       void run() override;
 
     private:
-      MessageQueue<M> &queue;
+      MessageQueue &queue;
       std::list<SenderChannel> channels;
   };
 }
-
 #endif //CONNECTIONS_H
