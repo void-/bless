@@ -3,6 +3,13 @@
 namespace Bless
 {
   /**
+   * @brief destruct a ConnectionKey and all its owned resources.
+   */
+  ConnectionKey::~ConnectionKey()
+  {
+  }
+
+  /**
    * @brief return the public certificate associated with this ConnectionKey.
    *
    * Ownership is still held by ConnectionKey.
@@ -15,6 +22,15 @@ namespace Bless
   }
 
   int CounterpartyKey::init(KeyStore &store)
+  {
+  }
+
+  /**
+   * @brief destruct a ServerKey and all its owned resources.
+   *
+   * Do nothing for now, lifecycle of privKey is unclear.
+   */
+  ServerKey::~ServerKey()
   {
   }
 
