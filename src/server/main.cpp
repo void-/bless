@@ -28,8 +28,26 @@ int main(int argc, char **argv)
 {
   int error = 0;
   InMemoryMessageQueue messages;
-  ReceiverMain recv(messages);
-  SenderMain sender(messages);
+  ReceiverMain recv;
+  SenderMain sender;
+  ServerKey keyToSender;
+  ServerKey keyToReceiver;
+
+  //...load ServerKeys
+
+  //initialize main connection threads
+  if((error = recv.init(&messages, &keyToReceiver)))
+  {
+    std::cerr << "Failed to initialize Receiver main." << std::endl;
+    goto fail;
+  }
+
+  //initialize thread for handling connections to Sender
+  if((error = sender.init(&messages, &keyToSender)))
+  {
+    std::cerr << "Failed to initialize Sender main." << std::endl;
+    goto fail;
+  }
 
   //start the sender main thread
   if((error = sender.start()))
