@@ -73,6 +73,34 @@ namespace Bless
   };
 
   /**
+   * @class MainConnection
+   * @brief abstract class for handling all connections to either Sender or
+   *   Receiver.
+   *
+   * This exists to avoid repeated code for ReceiverMain and SenderMain.
+   *
+   * @var MessageQueue *MainConnection::queue
+   * @brief shared message queue used to communicate Sender-sent Messages to
+   *   the Receiver.
+   *
+   * @var ServerKey *MainConnection::serverKey
+   * @brief certificate and private key used by the Server to connect to the
+   *   client(either Sender or Receiver).
+   */
+  class MainConnection
+  {
+    public:
+      virtual ~MainConnection();
+      virtual int init(MessageQueue *queue_, ServerKey *serverKey_);
+
+    protected:
+      MainConnection() = default;
+
+      MessageQueue *queue;
+      ServerKey *serverKey;
+  };
+
+  /**
    * @class ReceiverChannel
    * @brief store state for the message channel between the Server and Receiver
    *
@@ -107,17 +135,15 @@ namespace Bless
    * done to prevent main from doing nothing and instead have it execute as
    * ReceiverMain.
    */
-  class ReceiverMain
+  class ReceiverMain : public MainConnection
   {
     public:
-      ReceiverMain(MessageQueue &queue_);
+      ReceiverMain() = default;
       ~ReceiverMain();
 
-      int init();
       int start();
 
     private:
-      MessageQueue &queue;
       ReceiverChannel chan;
   };
 
@@ -157,18 +183,20 @@ namespace Bless
    *
    * This should run on its own thread and will create many threads to handle
    * individual connections.
+   *
+   * @var std::list<SenderChannel> SenderMain::channels
+   * @brief list of all active connections to Senders.
    */
-  class SenderMain : public Runnable
+  class SenderMain : public Runnable, public MainConnection
   {
     public:
-      SenderMain(MessageQueue &queue_);
+      SenderMain() = default;
       ~SenderMain();
 
     protected:
       void run() override;
 
     private:
-      MessageQueue &queue;
       std::list<SenderChannel> channels;
   };
 }

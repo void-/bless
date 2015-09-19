@@ -36,6 +36,34 @@ namespace Bless
   }
 
   /**
+   * @brief destruct a MainConnection and all its owned resources.
+   *
+   * @warning do not delete queue or serverKey, they are shared.
+   */
+  MainConnection::~MainConnection()
+  {
+  }
+
+  /**
+   * @brief initialize a main connection thread.
+   *
+   * No ownership of the parameters is taken.
+   *
+   * @param queue_ shared message queue to read or write Sender-sent messages
+   *   to.
+   * @param serverKey_ contains certificate and private key for connections to
+   *   either Senders or the Receiver.
+   * @return non-zero on failure.
+   */
+  int MainConnection::init(MessageQueue *queue_, ServerKey *serverKey_)
+  {
+    queue = queue_;
+    serverKey = serverKey_;
+
+    return 0;
+  }
+
+  /**
    * @brief construct a ReceiverChannel.
    *
    * @warning this is invalid until init() is called.
@@ -79,35 +107,11 @@ namespace Bless
   }
 
   /**
-   * @brief construct a new Receiver Main Thread given a shared MessageQueue.
-   *
-   * The reason this construct take \p queue_ as a parameter is to emphasize
-   * that this does not own the queue. It shares it and the queue's lifecycle
-   * encompasses this.
-   *
-   * This will create its own thread via ReceiverMain::chan.
-   *
-   * @param queue_ the message queue to receive messages on from the Sender.
-   */
-  ReceiverMain::ReceiverMain(MessageQueue &queue_) : queue(queue_)
-  {
-  }
-
-  /**
    * @brief destruct a Receiver Main Thread.
    *
    * This will close the connection to the Receiver.
    */
   ReceiverMain::~ReceiverMain()
-  {
-  }
-
-  /**
-   * @brief initialize a ReceiverMain.
-   *
-   * @return non-zero on failure.
-   */
-  int ReceiverMain::init()
   {
   }
 
@@ -121,15 +125,6 @@ namespace Bless
    * @return non-zero on failure.
    */
   int ReceiverMain::start()
-  {
-  }
-
-  /**
-   * @brief construct a SenderChannel.
-   *
-   * @warning this isn't valid until init() is called.
-   */
-  SenderChannel::SenderChannel()
   {
   }
 
@@ -161,18 +156,6 @@ namespace Bless
    * @brief perform the main logic of connecting to a Sender.
    */
   void SenderChannel::run()
-  {
-  }
-
-  /**
-   * @brief main function for handling connections to the Sender.
-   *
-   * This should run on its own thread and will create many threads to handle
-   * individual connections.
-   *
-   * @param queue message queue to write Sender-sent messages to.
-   */
-  SenderMain::SenderMain(MessageQueue &queue_) : queue(queue_)
   {
   }
 
