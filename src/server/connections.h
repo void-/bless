@@ -192,6 +192,8 @@ namespace Bless
     public:
       SenderMain() = default;
       ~SenderMain();
+      int init(MessageQueue *queue_, ServerKey *serverKey_,
+        KeyStore *store);
 
     protected:
       void run() override;
@@ -200,4 +202,5 @@ namespace Bless
       std::list<SenderChannel> channels;
   };
 }
+
 #endif //CONNECTIONS_H

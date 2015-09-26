@@ -167,6 +167,17 @@ namespace Bless
   }
 
   /**
+   * @brief initialize a Sender main thread.
+   *
+   * @param store KeyStore that stores Sender certificates.
+   */
+  int SenderMain::init(MessageQueue *queue_, ServerKey *serverKey_,
+      KeyStore *store)
+  {
+    MainConnection::init(queue_, serverKey_);
+  }
+
+  /**
    * @brief perform the main logic of receiving connections from Senders.
    */
   void SenderMain::run()
