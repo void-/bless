@@ -30,7 +30,14 @@ namespace Bless
   {
   }
 
-  int ServerKey::init(KeyStore &store)
+  /**
+   * @brief initialize a ServerKey given the path to a serialized certificate.
+   *
+   * @param privPath the path to the serialized private key.
+   * @param pubPath the path to the serialized certificate.
+   * @return non-zero on failure.
+   */
+  int ServerKey::init(std::string const &privPath, std::string const &pubPath)
   {
   }
 
