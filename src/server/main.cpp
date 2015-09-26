@@ -7,6 +7,8 @@
 #include "authKeys.h"
 #include "persistentStore.h"
 
+#include <botan/auto_rng.h>
+
 #include <iostream>
 
 /**
@@ -40,6 +42,7 @@ std::string defaultSenderCert = RESOURCE_PATH;
 int main(int argc, char **argv)
 {
   int error = 0;
+  Botan::AutoSeeded_RNG rng;
   InMemoryMessageQueue messages;
   ReceiverMain recv;
   SenderMain sender;
@@ -49,7 +52,8 @@ int main(int argc, char **argv)
 
   //load Server keys
   if((error =
-      (keyToSender.init(defaultServerSenderKey, defaultServerSenderCert))))
+      (keyToSender.init(defaultServerSenderKey, defaultServerSenderCert,
+        rng))))
   {
     std::cerr << "Failed to load Server public or private key to Sender." <<
       std::endl;
@@ -58,7 +62,7 @@ int main(int argc, char **argv)
 
   if((error =
       (keyToReceiver.init(
-        defaultServerReceiverKey, defaultServerReceiverCert))))
+        defaultServerReceiverKey, defaultServerReceiverCert, rng))))
   {
     std::cerr << "Failed to load Server public or private key to Receiver." <<
       std::endl;
