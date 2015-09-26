@@ -54,7 +54,8 @@ namespace Bless
   {
     public:
       ~ServerKey() override;
-      int init(std::string const &privPath, std::string const &pubPath);
+      int init(std::string const &privPath, std::string const &pubPath,
+        Botan::RandomNumberGenerator &rng);
 
       Botan::Private_Key const *getPrivKey();
 

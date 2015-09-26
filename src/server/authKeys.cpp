@@ -1,5 +1,7 @@
 #include "authKeys.h"
 
+#include <botan/pkcs8.h>
+
 using namespace Botan;
 
 namespace Bless
@@ -72,12 +74,43 @@ namespace Bless
   /**
    * @brief initialize a ServerKey given the path to a serialized certificate.
    *
+   * TODO: Reused code from Bless::Receiver::auth for loading priv key
+   *
    * @param privPath the path to the serialized private key.
    * @param pubPath the path to the serialized certificate.
+   * @param rng random number generator for loading private key.
    * @return non-zero on failure.
    */
-  int ServerKey::init(std::string const &privPath, std::string const &pubPath)
+  int ServerKey::init(std::string const &privPath, std::string const &pubPath,
+      Botan::RandomNumberGenerator &rng)
   {
+    //load the public key
+    if(ConnectionKey::init(pubPath))
+    {
+      return -1;
+    }
+
+    //load the private key
+    try
+    {
+      privKey = PKCS8::load_key(privPath, rng);
+    }
+    catch(Stream_IO_Error &e)
+    {
+      return -2;
+    }
+    catch(PKCS8_Exception &e)
+    {
+      return -3;
+    }
+    catch(Decoding_Error &e)
+    {
+      //unknown algorithm
+      return -4;
+    }
+
+    //no error
+    return 0;
   }
 
   /**
