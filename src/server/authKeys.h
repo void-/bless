@@ -40,17 +40,6 @@ namespace Bless
   };
 
   /**
-   * @class CounterpartyKey
-   * @brief holds the certificate of either the Sender or Receiver.
-   */
-  class CounterpartyKey : public ConnectionKey
-  {
-    public:
-      ~CounterpartyKey() override;
-      int init(KeyStore &store) override;
-  };
-
-  /**
    * @class ServerKey
    * @brief stores both the certificate and corresponding private key of the
    *   Server.

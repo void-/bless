@@ -21,10 +21,6 @@ namespace Bless
     return cert;
   }
 
-  int CounterpartyKey::init(KeyStore &store)
-  {
-  }
-
   /**
    * @brief destruct a ServerKey and all its owned resources.
    *
