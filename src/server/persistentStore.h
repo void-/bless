@@ -56,7 +56,7 @@ namespace Bless
    * @var std::list<Botan::X509_Certificate> FileSystemStore::stagedIn
    * @brief all the keys staged into memory from file in FileSystemStore::path.
    */
-  class FileSystemStore : KeyStore
+  class FileSystemStore : public KeyStore
   {
     public:
       FileSystemStore() = default;
