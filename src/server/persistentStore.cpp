@@ -3,6 +3,43 @@
 namespace Bless
 {
   /**
+   * @brief destruct a FileSystemStore and all its owned resources.
+   */
+  FileSystemStore::~FileSystemStore()
+  {
+  }
+
+  /**
+   * @brief initialize a FileSystemStore given the path to a directory.
+   *
+   * The directory as \p path needs to be opened and the certificates loaded
+   * into the stagedIn list.
+   *
+   * @param path the directory path to load certificates from.
+   * @return non-zero on failure.
+   */
+  int FileSystemStore::init(std::string &path)
+  {
+  }
+
+  /**
+   * @brief given a candidate cert from the Sender, determine if its valid.
+   *
+   * To determine validity, there are two key things to check:
+   * - Whether the certificate is in the KeyStore backend
+   * - The certificate is valid
+   * - - The self-signature is valid
+   * - - The time stamp hasn't passed
+   * - - etc.
+   *
+   * @param cert the certificate from the Sender to verify.
+   * @return 0 if \p cert is valid, an error code otherwise.
+   */
+  int FileSystemStore::isValid(Botan::X509_Certificate const &cert)
+  {
+  }
+
+  /**
    * @brief destruct a MessageQueue and all its owned resources.
    */
   MessageQueue::~MessageQueue()

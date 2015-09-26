@@ -13,6 +13,7 @@
 #include <botan/x509cert.h>
 
 #include <condition_variable>
+#include <list>
 #include <queue>
 
 namespace Bless
@@ -35,6 +36,38 @@ namespace Bless
   {
     public:
       virtual int isValid(Botan::X509_Certificate const &cert) = 0;
+  };
+
+  /**
+   * @brief FileSystemStore
+   * @brief implementation of KeyStore that uses the filesystem as a storage
+   *   backend.
+   *
+   * Thise is a more primitive, yet persistent, storage mechanism for Reciever
+   * Certs.
+   *
+   * The premise is that this is initialized with a directory path. Each file
+   * is a serialized X509_Certificate. The filenames are not meaningful, but
+   * could be used for quick lookup.
+   *
+   * @var std::string FileSystemStore::path
+   * @brief the path to the directory containing serialized keys.
+   *
+   * @var std::list<Botan::X509_Certificate> FileSystemStore::stagedIn
+   * @brief all the keys staged into memory from file in FileSystemStore::path.
+   */
+  class FileSystemStore : KeyStore
+  {
+    public:
+      FileSystemStore() = default;
+      ~FileSystemStore();
+
+      int init(std::string &path);
+      int isValid(Botan::X509_Certificate const &cert) override;
+
+    private:
+      std::string path;
+      std::list<Botan::X509_Certificate> stagedIn;
   };
 
   /**
