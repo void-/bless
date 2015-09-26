@@ -35,6 +35,7 @@ namespace Bless
 
       Botan::X509_Certificate const *getCert();
     protected:
+      int init(std::string const &path);
       Botan::X509_Certificate const *cert;
   };
 
