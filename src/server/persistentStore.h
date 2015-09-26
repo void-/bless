@@ -10,6 +10,8 @@
 
 #include <bless/message.h>
 
+#include <botan/x509cert.h>
+
 #include <condition_variable>
 #include <queue>
 
@@ -17,10 +19,22 @@ namespace Bless
 {
   /**
    * @class KeyStore
-   * @brief interface to disk for Sender certificates.
+   * @brief abstract interface to disk for Sender certificates.
+   *
+   * The PKI for Bless is designed primarily as in-person exchange. When making
+   * a tls connection, for any valid cert that the Sender sends us, the Server
+   * should have it.
+   *
+   * This means that we only need to verify a cert was indeed exchanged
+   * in-person. Hence, the only interface for KeyStore is testing whether a
+   * given cert is both valid and in the KeyStore.
+   *
+   * We don't have to worry about providing an interface to use loaded certs.
    */
   class KeyStore
   {
+    public:
+      virtual int isValid(Botan::X509_Certificate const &cert) = 0;
   };
 
   /**
