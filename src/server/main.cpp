@@ -9,7 +9,20 @@
 
 #include <iostream>
 
+/**
+ * Directory path to default resources.
+ */
+#ifndef RESOURCE_PATH
+#define RESOURCE_PATH "./"
+#endif //RESOURCE_PATH
+
 using namespace Bless;
+
+std::string defaultServerSenderKey = RESOURCE_PATH"Sender";
+std::string defaultServerSenderCert = RESOURCE_PATH"Sender.pub";
+std::string defaultServerReceiverKey = RESOURCE_PATH"Receiver";
+std::string defaultServerReceiverCert = RESOURCE_PATH"Receiver.pub";
+std::string defaultSenderCert = RESOURCE_PATH;
 
 /**
  * @brief run the bless Server.
@@ -32,8 +45,32 @@ int main(int argc, char **argv)
   SenderMain sender;
   ServerKey keyToSender;
   ServerKey keyToReceiver;
+  FileSystemStore store;
 
-  //...load ServerKeys
+  //load Server keys
+  if((error =
+      (keyToSender.init(defaultServerSenderKey, defaultServerSenderCert))))
+  {
+    std::cerr << "Failed to load Server public or private key to Sender." <<
+      std::endl;
+    goto fail;
+  }
+
+  if((error =
+      (keyToReceiver.init(
+        defaultServerReceiverKey, defaultServerReceiverCert))))
+  {
+    std::cerr << "Failed to load Server public or private key to Receiver." <<
+      std::endl;
+    goto fail;
+  }
+
+  //load Sender certificate store
+  if((error = store.init(defaultSenderCert)))
+  {
+    std::cerr << "Couldn't load Sender certificate stores." << std::endl;
+    goto fail;
+  }
 
   //initialize main connection threads
   if((error = recv.init(&messages, &keyToReceiver)))
@@ -43,7 +80,7 @@ int main(int argc, char **argv)
   }
 
   //initialize thread for handling connections to Sender
-  if((error = sender.init(&messages, &keyToSender)))
+  if((error = sender.init(&messages, &keyToSender, &store)))
   {
     std::cerr << "Failed to initialize Sender main." << std::endl;
     goto fail;
