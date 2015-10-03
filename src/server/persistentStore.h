@@ -39,7 +39,7 @@ namespace Bless
   };
 
   /**
-   * @brief FileSystemStore
+   * @class FileSystemStore
    * @brief implementation of KeyStore that uses the filesystem as a storage
    *   backend.
    *
