@@ -132,17 +132,14 @@ namespace Bless
    * @class ReceiverMain
    * @brief main class for handling a changing connection to the Receiver.
    *
-   * Don't subclass Runnable so that the main thread can execute this. This is
-   * done to prevent main from doing nothing and instead have it execute as
-   * ReceiverMain.
    */
-  class ReceiverMain : public MainConnection
+  class ReceiverMain : public MainConnection, public Runnable
   {
     public:
       ReceiverMain() = default;
       ~ReceiverMain();
 
-      int start();
+      void run() override;
 
     private:
       ReceiverChannel chan;
