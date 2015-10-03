@@ -125,7 +125,13 @@ namespace Bless
   /**
    * @brief start listening for connections from the Receiver.
    *
-   * @return non-zero on failure.
+   * pseudocode
+   * @code
+   *   open a socket
+   *   listen for a connection
+   *   chan.init(new socket); chan.run();
+   *   while(...) {listen; chan.init(new socket)}
+   * @endcode
    */
   void ReceiverMain::run()
   {
