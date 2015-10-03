@@ -35,6 +35,7 @@ namespace Bless
   {
     public:
       Runnable(const Runnable &) = delete;
+      virtual ~Runnable();
 
       int start();
 

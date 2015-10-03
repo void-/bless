@@ -3,6 +3,13 @@
 namespace Bless
 {
   /**
+   * @brief destruct a runnable.
+   */
+  Runnable::~Runnable()
+  {
+  }
+
+  /**
    * @brief start the underlying thread of the Runnable.
    *
    * @return non-zero if the thread fails to start.
