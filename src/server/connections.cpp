@@ -123,15 +123,11 @@ namespace Bless
   }
 
   /**
-   * @brief start listening for connections from the Receiver and block.
-   *
-   * Unlike SenderChannel::start() this function blocks so it can be run by the
-   * main thread. Subclass Runnable and rename this function to run() if this
-   * is not the desired behaviour.
+   * @brief start listening for connections from the Receiver.
    *
    * @return non-zero on failure.
    */
-  int ReceiverMain::start()
+  void ReceiverMain::run()
   {
   }
 
@@ -164,6 +160,7 @@ namespace Bless
    */
   void SenderChannel::run()
   {
+
   }
 
   /**
