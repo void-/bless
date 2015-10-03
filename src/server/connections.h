@@ -80,6 +80,9 @@ namespace Bless
    *
    * This exists to avoid repeated code for ReceiverMain and SenderMain.
    *
+   * @var int MainConnection::listen
+   * @brief socket to listen for connections on.
+   *
    * @var MessageQueue *MainConnection::queue
    * @brief shared message queue used to communicate Sender-sent Messages to
    *   the Receiver.
@@ -97,6 +100,7 @@ namespace Bless
     protected:
       MainConnection() = default;
 
+      int listen;
       MessageQueue *queue;
       ServerKey *serverKey;
   };
