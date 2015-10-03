@@ -154,7 +154,6 @@ namespace Bless
    *
    * pseudocode
    * @code
-   *   open a socket
    *   listen for a connection
    *   chan.init(new socket); chan.run();
    *   while(...) {listen; chan.init(new socket)}
