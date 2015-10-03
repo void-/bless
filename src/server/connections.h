@@ -143,6 +143,8 @@ namespace Bless
       ReceiverMain() = default;
       ~ReceiverMain();
 
+      int init(MessageQueue *queue_, ServerKey *serverKey_) override;
+
       void run() override;
 
     private:

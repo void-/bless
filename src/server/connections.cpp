@@ -123,6 +123,33 @@ namespace Bless
   }
 
   /**
+   * @brief initialize the main thread for listen to Receiver connections.
+   *
+   * @see MainConnection::init()
+   *
+   * @param queue_ parameter to MainConnection::init.
+   * @param serverKey_ parameter to MainConnection::init.
+   *
+   * @return non-zero on failure.
+   */
+  int ReceiverMain::init(MessageQueue *queue_, ServerKey *serverKey_)
+  {
+    //initialize a main connection like normal
+    if(MainConnection::init(queue_, serverKey_))
+    {
+      return -1;
+    }
+
+    //allocate a socket, but don't listen on it yet
+    if((listen = socket(PF_INET, SOCK_DGRAM, 0) == -1))
+    {
+      return -2;
+    }
+
+    return 0;
+  }
+
+  /**
    * @brief start listening for connections from the Receiver.
    *
    * pseudocode
