@@ -34,8 +34,9 @@ namespace Bless
       virtual ~ConnectionKey();
 
       Botan::X509_Certificate const *getCert();
-    protected:
       int init(std::string const &path);
+
+    protected:
       Botan::X509_Certificate const *cert;
   };
 
