@@ -19,6 +19,8 @@
 #include <list>
 
 #include <botan/tls_server.h>
+#include <botan/tls_session_manager.h>
+#include <botan/credentials_manager.h>
 
 namespace Bless
 {
@@ -68,8 +70,12 @@ namespace Bless
 
     protected:
       Channel() = default;
-      int connection;
+
       Botan::TLS::Server *server;
+      Botan::TLS::Session_Manager *sessionManager;
+      Botan::Credentials_Manager *credentialsManager;
+      Botan::TLS::Policy *policy;
+      int connection;
       ServerKey *serverKey;
   };
 
@@ -95,7 +101,7 @@ namespace Bless
   {
     public:
       virtual ~MainConnection();
-      virtual int init(MessageQueue *queue_, ServerKey *serverKey_);
+      int init(MessageQueue *queue_, ServerKey *serverKey_);
 
     protected:
       MainConnection() = default;
@@ -124,12 +130,21 @@ namespace Bless
     public:
       ReceiverChannel();
       ~ReceiverChannel();
-      int init(int socket, sockaddr_in addr, ConnectionKey *receiver,
-        ServerKey *server);
+      int init(int &socket, sockaddr_in addr, ConnectionKey *receiver,
+        ServerKey *serverKey, Botan::RandomNumberGenerator &rng);
 
     protected:
+      static void send(int sock, const Botan::byte *const payload, size_t len);
+      void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
+        size_t len);
+      void recvData(const Botan::byte *const payload, size_t len);
+      bool handshake(const Botan::TLS::Session &session);
+      std::string nextProtocol(std::vector<std::string> protocols);
+
       void run() override;
       ConnectionKey *receiverKey;
+
+      static const size_t bufferSize = 4096;
   };
 
   /**
@@ -143,12 +158,17 @@ namespace Bless
       ReceiverMain() = default;
       ~ReceiverMain();
 
-      int init(MessageQueue *queue_, ServerKey *serverKey_) override;
-
+      int init(MessageQueue *queue_, ServerKey *serverKey_,
+        ConnectionKey *receiverKey_, Botan::RandomNumberGenerator *rng_);
       void run() override;
 
+      static const int backlog = 1;
+      static const unsigned short port = 9549;
+
     private:
+      ConnectionKey *receiverKey;
       ReceiverChannel chan;
+      Botan::RandomNumberGenerator *rng;
   };
 
   /**
