@@ -335,6 +335,7 @@ namespace Bless
     int tmpSocket = -1;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
+    TLS::Server *oldServer;
 
     //allocate a socket to write to
     if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0) == -1))
@@ -399,7 +400,8 @@ namespace Bless
     //start up the connection to the candidate Receiver
     while(!tmpServer->is_active())
     {
-      size_t len = ::read(tmpSocket, readBuffer, sizeof(readBuffer));
+      //read from the socket param
+      size_t len = ::read(socket, readBuffer, sizeof(readBuffer));
 
       //failed to read bytes
       if(len <= 0)
@@ -415,11 +417,16 @@ namespace Bless
     serverKey = serverKey_;
 
     //if the connection succeeds, shutdown and replace the current connection
-    if(server)
+    oldServer = server;
+
+    //writes are atomic, so no sync is needed
+    server = tmpServer;
+
+    if(oldServer)
     {
       server->close();
+      delete oldServer;
     }
-    server = tmpServer;
     return 0;
 
     //if the connection fails; don't modify anything
@@ -436,17 +443,24 @@ fail:
   }
 
   /**
-   * @brief send
+   * @brief send write \p len bytes of \p payload to udp socket \p sock.
    *
-   * @param payload
-   * @param len)
+   * @param sock the udp socket to write out to.
+   * @param payload data to write to \p sock.
+   * @param len length, in bytes, of \p sock.
    */
   void ReceiverChannel::send(int sock, const byte *const payload, size_t len)
   {
+    auto l = ::send(sock, payload, len, MSG_NOSIGNAL);
+
+    if(l < len)
+    {
+      //error writing to socket
+    }
   }
 
   /**
-   * @brief
+   * @brief called when a TLS alert is received
    *
    * @param alert
    * @param payload
@@ -458,7 +472,11 @@ fail:
   }
 
   /**
-   * @brief
+   * @brief called when data is received from Receiver, which should never
+   * happen.
+   *
+   * This function is a no op, because the Receiver should never send the
+   * Server data after the initial connection is made.
    *
    * @param payload
    * @param len
@@ -468,7 +486,7 @@ fail:
   }
 
   /**
-   * @brief
+   * @brief called when a handshake is created from Receiver to Server.
    *
    * @param session
    *
@@ -480,11 +498,12 @@ fail:
   }
 
   /**
-   * @brief
+   * @brief called to pick a protocol between Receiver and Sender; this feature
+   * is not used.
    *
    * @param protocols
    *
-   * @return
+   * @return an empty string indicating no protocol.
    */
   std::string ReceiverChannel::nextProtocol(std::vector<std::string> protocols)
   {
