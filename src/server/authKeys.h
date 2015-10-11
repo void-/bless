@@ -58,7 +58,7 @@ namespace Bless
       int init(std::string const &privPath, std::string const &pubPath,
         Botan::RandomNumberGenerator &rng);
 
-      Botan::Private_Key const *getPrivKey();
+      Botan::Private_Key *getPrivKey();
 
     private:
       Botan::Private_Key *privKey;

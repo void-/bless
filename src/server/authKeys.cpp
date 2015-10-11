@@ -120,7 +120,7 @@ namespace Bless
    *
    * @return ServerKey::privKey.
    */
-  Botan::Private_Key const *ServerKey::getPrivKey()
+  Botan::Private_Key *ServerKey::getPrivKey()
   {
     return privKey;
   }
