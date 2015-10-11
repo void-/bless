@@ -333,7 +333,6 @@ namespace Bless
   {
     Botan::TLS::Server *tmpServer;
     int tmpSocket = -1;
-    std::unique_lock<std::mutex> handshakeWait;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
 
