@@ -69,7 +69,7 @@ namespace Bless
       int init(int socket, sockaddr_in addr, ServerKey *server);
 
     protected:
-      Channel() = default;
+      Channel();
 
       Botan::TLS::Server *server;
       Botan::TLS::Session_Manager *sessionManager;
@@ -130,8 +130,8 @@ namespace Bless
     public:
       ReceiverChannel();
       ~ReceiverChannel();
-      int init(int &socket, sockaddr_in addr, ConnectionKey *receiver,
-        ServerKey *serverKey, Botan::RandomNumberGenerator &rng);
+      int init(int &socket, sockaddr_in addr, ConnectionKey *receiverKey_,
+        ServerKey *serverKey_, Botan::RandomNumberGenerator &rng);
 
     protected:
       static void send(int sock, const Botan::byte *const payload, size_t len);
