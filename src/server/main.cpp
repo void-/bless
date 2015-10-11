@@ -10,6 +10,7 @@
 #include <botan/auto_rng.h>
 
 #include <iostream>
+#include <condition_variable>
 
 /**
  * Directory path to default resources.
@@ -26,6 +27,9 @@ std::string defaultServerReceiverKey = RESOURCE_PATH"Receiver";
 std::string defaultServerReceiverCert = RESOURCE_PATH"Receiver.pub";
 std::string defaultSenderCert = RESOURCE_PATH;
 
+std::mutex exitLock;
+std::condition_variable mainExit;
+
 /**
  * @brief run the bless Server.
  *
@@ -34,6 +38,9 @@ std::string defaultSenderCert = RESOURCE_PATH;
  *
  * In the future, authentication keys should be loaded from alternative
  * resources if available via \p argv.
+ *
+ * main() will run until mainExit condition variable is signaled. This gives
+ * the Sender and Receiver threads a chance to run.
  *
  * @param argc length of \p argv.
  * @param argv argument vector to run the server with non-default behaviour.
@@ -48,7 +55,9 @@ int main(int argc, char **argv)
   SenderMain sender;
   ServerKey keyToSender;
   ServerKey keyToReceiver;
+  ConnectionKey receiverKey;
   FileSystemStore store;
+  std::unique_lock<std::mutex> waitLock;
 
   //load Server keys
   if((error =
@@ -69,6 +78,13 @@ int main(int argc, char **argv)
     goto fail;
   }
 
+  //load receiver certificate
+  if((error = receiverKey.init(defaultReceiverCert)))
+  {
+    std::cerr << "Couldn't load Receiver certificate." << std::endl;
+    goto fail;
+  }
+
   //load Sender certificate store
   if((error = store.init(defaultSenderCert)))
   {
@@ -77,7 +93,7 @@ int main(int argc, char **argv)
   }
 
   //initialize main connection threads
-  if((error = recv.init(&messages, &keyToReceiver)))
+  if((error = recv.init(&messages, &keyToReceiver, &receiverKey, &rng)))
   {
     std::cerr << "Failed to initialize Receiver main." << std::endl;
     goto fail;
@@ -103,6 +119,10 @@ int main(int argc, char **argv)
     std::cerr << "Failed to start Receiver." << std::endl;
     goto fail;
   }
+
+  //wait until its time to exit
+  waitLock = std::unique_lock<std::mutex>(exitLock);
+  mainExit.wait(waitLock);
 
 fail:
   return error;
