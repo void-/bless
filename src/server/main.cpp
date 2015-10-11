@@ -21,10 +21,11 @@
 
 using namespace Bless;
 
-std::string defaultServerSenderKey = RESOURCE_PATH"Sender";
-std::string defaultServerSenderCert = RESOURCE_PATH"Sender.pub";
-std::string defaultServerReceiverKey = RESOURCE_PATH"Receiver";
-std::string defaultServerReceiverCert = RESOURCE_PATH"Receiver.pub";
+std::string defaultServerSenderKey = RESOURCE_PATH"senderKey.pem";
+std::string defaultServerSenderCert = RESOURCE_PATH"sender.pem";
+std::string defaultServerReceiverKey = RESOURCE_PATH"recvKey.pem";
+std::string defaultServerReceiverCert = RESOURCE_PATH"receiver.pem";
+std::string defaultReceiverCert = RESOURCE_PATH"receiver.pem";
 std::string defaultSenderCert = RESOURCE_PATH;
 
 std::mutex exitLock;
