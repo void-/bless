@@ -23,6 +23,219 @@ namespace Bless
   }
 
   /**
+   * @class ReceiverChannelPolicy
+   * @brief specifies the connection policy for the message channel.
+   *
+   * The ultimate goal is to use safe curves such as Curve25519 implemented in
+   * Botan. However, there is no support for this with D/TLS.
+   *
+   * @todo this is a copy from Bless::Receiver
+   */
+  class ReceiverChannelPolicy : public TLS::Strict_Policy
+  {
+    public:
+      /**
+       * @brief turn DTLS heartbeats off.
+       *
+       * @bug heartbeats are only client to server, which defeats the purpose.
+       * This is only useful if it could be from server to client, but is not.
+       *
+       * @return false.
+       */
+      bool negotiate_hearbeat_support() const
+      {
+        return false;
+      }
+
+      /**
+       * @brief turn off server initiated renegotiation.
+       *
+       * The Server shouldn't be able to send any data that will require a
+       * client response.
+       *
+       * @return false.
+       */
+      bool allow_server_initiated_renegotiation() const override
+      {
+        return false;
+      }
+
+      /**
+       * @brief given a protocol version, return whether its ok.
+       *
+       * Only DTLS1.2 is acceptable.
+       *
+       * @param version the protocol version in question.
+       * @return whether \p version is DTLS1.2.
+       */
+      bool acceptable_protocol_version(TLS::Protocol_Version version) const
+      {
+        return version == TLS::Protocol_Version::DTLS_V12;
+      }
+  };
+
+  /**
+   * @class ReceiverChannelCredentials
+   * @brief Manage the credentials for the message channel.
+   */
+  class ReceiverChannelCredentials : public Credentials_Manager
+  {
+    public:
+      /**
+       * @brief construct a ChannelCredentials.
+       *
+       * @warning this isn't valid until init() is called.
+       */
+      ReceiverChannelCredentials()
+      {
+      }
+
+      /**
+       * @brief destruct the ChannelCredentials.
+       *
+       * Don't deallocate authKeys.
+       */
+      ~ReceiverChannelCredentials() override
+      {
+      }
+
+      /**
+       * @brief initialize credentials to the Receiver.
+       *
+       * @param serverKey_ the Server's certificate and private key.
+       * @param receiverKey_ the Receiver's certificate.
+       *
+       * @return non-zero on failure.
+       */
+      int init(ServerKey *serverKey_, ConnectionKey *receiverKey_)
+      {
+        serverKey = serverKey_;
+        receiverKey = receiverKey_;
+
+        return 0;
+      }
+
+      /**
+       * @brief return no trusted certificate authorities.
+       *
+       * Self-signed certificates are used between the Server and Receiver; no
+       * certificate authorities are trusted.
+       *
+       * @return an empty vector
+       */
+      std::vector<Certificate_Store *> trusted_certificate_authorities(
+          const std::string &, const std::string &) override
+      {
+        return std::vector<Certificate_Store *>();
+      }
+
+      /**
+       * @brief verify the given certificate chain.
+       *
+       * \p certChain should contain the Receiver's public key.
+       *
+       * If the certificate matches, it must be valid because it was verified
+       * @todo where is this cert verified.
+       *
+       * @param type the type of operation occuring.
+       * @param certChain the certificate chain to verify.
+       * @throw std::invalid_argument if its wrong.
+       * @throw std::runtime_error if \p type is not "tls_client"
+       */
+      void verify_certificate_chain(const std::string &type,
+          const std::string &,
+          const std::vector<X509_Certificate> &certChain) override
+      {
+        if(type != "tls-client")
+        {
+          throw std::runtime_error("Must use for tls-client.");
+        }
+
+        if(!(certChain.size() == 1 &&
+            certChain[0] == *receiverKey->getCert()))
+        {
+          throw std::invalid_argument("Certificate did not match Receiver's.");
+        }
+      }
+
+      /**
+       * @brief return a certificate chain to identify the Server.
+       *
+       * This returns the Server's self-signed cert, regardless of the type
+       * of key requested.
+       *
+       * This must be communicated, to the Receiver by means of some externel
+       * PKI.
+       *
+       * @param type the type of operation occuring
+       * @throw std::runtime_error if \p type is not "tls_client"
+       * @return vector containing the self-signed certificate for the Server.
+       */
+      std::vector<X509_Certificate> cert_chain(const std::vector<std::string>
+          &, const std::string &type, const std::string &)
+          override
+      {
+        if(type != "tls-client")
+        {
+          throw std::runtime_error("Must use for tls-client.");
+        }
+        auto cert = serverKey->getCert();
+        return std::vector<X509_Certificate>{*cert};
+      }
+
+      /**
+       * @brief return the private key corresponding to the given \p cert.
+       *
+       * \p cert should have been returned by cert_chain().
+       *
+       * @param cert the certificate to yield the private key for.
+       * @param type the type of operation occuring.
+       * @throw std::runtime_error if \p type is not "tls_client"
+       * @return the private half of \p cert.
+       */
+      Private_Key *private_key_for(const X509_Certificate &cert,
+          const std::string &type, const std::string &) override
+      {
+        if(type != "tls-client")
+        {
+          throw std::runtime_error("Must use for tls-client.");
+        }
+
+        //if the cert is the Receiver's, return the private key
+        if(cert == *serverKey->getCert())
+        {
+          return serverKey->getPrivKey();
+        }
+
+        return nullptr;
+      }
+
+      /**
+       * @brief return whether an SRP connection should be attempted.
+       *
+       * Never try SRP, use long-standing public keys.
+       *
+       * @return false.
+       */
+      bool attempt_srp(const std::string &, const std::string &) override
+      {
+        return false;
+      }
+
+    private:
+      ServerKey *serverKey;
+      ConnectionKey *receiverKey;
+  };
+
+  /**
+   * @brief construct a Channel, initializing some pointers to null.
+   */
+  Channel::Channel() : server(nullptr), sessionManager(nullptr),
+      credentialsManager(nullptr), policy(nullptr)
+  {
+  }
+
+  /**
    * @brief destruct a Channel and all its owned resources.
    */
   Channel::~Channel()
@@ -78,7 +291,7 @@ namespace Bless
    *
    * @warning this is invalid until init() is called.
    */
-  ReceiverChannel::ReceiverChannel()
+  ReceiverChannel::ReceiverChannel() : Channel()
   {
   }
 
@@ -115,13 +328,14 @@ namespace Bless
    * @return non-zero on failure.
    */
   int ReceiverChannel::init(int &socket, sockaddr_in addr,
-      ConnectionKey *receiver, ServerKey *serverKey,
+      ConnectionKey *receiverKey_, ServerKey *serverKey_,
       RandomNumberGenerator &rng)
   {
     Botan::TLS::Server *tmpServer;
     int tmpSocket = -1;
     std::unique_lock<std::mutex> handshakeWait;
     sockaddr_in tmpAddr = addr;
+    unsigned char readBuffer[bufferSize];
 
     //allocate a socket to write to
     if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0) == -1))
@@ -136,26 +350,28 @@ namespace Bless
       goto fail;
     }
 
-    //XXX: initialize credentials manager; this should be a single instance
+    if(!sessionManager)
+    {
+      try
+      {
+        policy = new ReceiverChannelPolicy();
+        sessionManager = new TLS::Session_Manager_Noop();
+        auto creds = new ReceiverChannelCredentials();
 
-    /**
-     * have the callback member function signal a condition variable.
-     * Wait on that condition variable after creating the server
-     * Check the condition - indicating whether the connection suceeded;
-     *   i.e the new connection was indeed a new Receiver
-     *
-     * Need to setup the callbacks so they use the temporary socket
-     * This is ok because the socket will be replaced eventually
-     *
-     * This shouldn't lock the ReceiverChannel thread to avoid Dos
-     * The core issue is that this->send is being used for two connections
-     *
-     * This doesn't go async. No condvar needed. When is_active is true, the
-     * connection is active
-     *
-     * A different idea: make a tls server in main thread and pass off to
-     * receiver thread
-     */
+        if(creds->init(serverKey_, receiverKey_))
+        {
+          goto fail;
+        }
+
+        credentialsManager = creds;
+      }
+      catch(std::bad_alloc &e)
+      {
+        //couldn't dynamically allocate memory
+        goto fail;
+      }
+    }
+
     //create a new connection using socket
     tmpServer = new Botan::TLS::Server(
       //we capture the temporary socket
@@ -184,17 +400,31 @@ namespace Bless
     //start up the connection to the candidate Receiver
     while(!tmpServer->is_active())
     {
+      size_t len = ::read(tmpSocket, readBuffer, sizeof(readBuffer));
+
+      //failed to read bytes
+      if(len <= 0)
+      {
+        goto fail;
+      }
+      tmpServer->received_data(readBuffer, len);
     }
+    //XXX: how do we know if the connection failed?
+    //it probably calls back alert(), which would fail the current connection
+
+    receiverKey = receiverKey_;
+    serverKey = serverKey_;
 
     //if the connection succeeds, shutdown and replace the current connection
-    //if the connection fails; don't modify anything
-    connection = tmpSocket;
-    //XXX: close down the old server
+    if(server)
+    {
+      server->close();
+    }
     server = tmpServer;
     return 0;
 
+    //if the connection fails; don't modify anything
 fail:
-
     //try to close the temporary socket
     if(tmpSocket != -1)
     {
