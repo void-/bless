@@ -1,5 +1,7 @@
 #include "connections.h"
 
+using namespace Botan;
+
 namespace Bless
 {
   /**
@@ -40,6 +42,7 @@ namespace Bless
    */
   int Channel::init(int socket, sockaddr_in addr, ServerKey *server)
   {
+    return 0;
   }
 
   /**
@@ -92,15 +95,171 @@ namespace Bless
    * init() can be called multiple times as new connections are initiated by
    * the Receiver.
    *
-   * @param sock udp socket the Receiver has connected to.
-   * @param receiver socket information about \p sock.
+   * pseudocode
+   * @code
+   *   create and init a dtls server
+   *   init a connection using \p socket
+   *   the first packet should be client hello
+   *   allocate a socket to write to the receiver
+   *   if the connection succeeds, replace channel socket
+   *   replace keys
+   * @endcode
+   *
+   * \p socket will we read off of, but no reads will occur after init()
+   * returns. The lifetime of \p socket just needs to exceed init().
+   *
+   * @param socket borrowed udp socket that dtls connection initialization
+   *   packets are read from, but not written to.
+   * @param receiver socket information about \p socket.
    * @param client ConectionKey containing the Receiver's certificate.
    * @return non-zero on failure.
    */
-  int ReceiverChannel::init(int socket, sockaddr_in addr,
-      ConnectionKey *receiver, ServerKey *server)
+  int ReceiverChannel::init(int &socket, sockaddr_in addr,
+      ConnectionKey *receiver, ServerKey *serverKey,
+      RandomNumberGenerator &rng)
   {
+    Botan::TLS::Server *tmpServer;
+    int tmpSocket = -1;
+    std::unique_lock<std::mutex> handshakeWait;
+    sockaddr_in tmpAddr = addr;
+
+    //allocate a socket to write to
+    if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0) == -1))
+    {
+      goto fail;
+    }
+
+    //connect the socket to the candidate receiver
+    if(::connect(socket, reinterpret_cast<const sockaddr *>(&tmpAddr),
+        sizeof(tmpAddr)))
+    {
+      goto fail;
+    }
+
+    //XXX: initialize credentials manager; this should be a single instance
+
+    /**
+     * have the callback member function signal a condition variable.
+     * Wait on that condition variable after creating the server
+     * Check the condition - indicating whether the connection suceeded;
+     *   i.e the new connection was indeed a new Receiver
+     *
+     * Need to setup the callbacks so they use the temporary socket
+     * This is ok because the socket will be replaced eventually
+     *
+     * This shouldn't lock the ReceiverChannel thread to avoid Dos
+     * The core issue is that this->send is being used for two connections
+     *
+     * This doesn't go async. No condvar needed. When is_active is true, the
+     * connection is active
+     *
+     * A different idea: make a tls server in main thread and pass off to
+     * receiver thread
+     */
+    //create a new connection using socket
+    tmpServer = new Botan::TLS::Server(
+      //we capture the temporary socket
+      [tmpSocket](const byte *const data, size_t len) {
+        ReceiverChannel::send(tmpSocket, data, len);
+      },
+      [this](const byte *const data, size_t len) {
+        this->recvData(data, len);
+      },
+      [this](TLS::Alert alert, const byte *const payload, size_t len) {
+        this->alert(alert, payload, len);
+      },
+      [this](const TLS::Session &session) {
+        return this->handshake(session);
+      },
+      *sessionManager,
+      *credentialsManager,
+      *policy,
+      rng,
+      [this](std::vector<std::string> proto) {
+        return this->nextProtocol(proto);
+      },
+      true,
+      bufferSize);
+
+    //start up the connection to the candidate Receiver
+    while(!tmpServer->is_active())
+    {
+    }
+
+    //if the connection succeeds, shutdown and replace the current connection
+    //if the connection fails; don't modify anything
+    connection = tmpSocket;
+    //XXX: close down the old server
+    server = tmpServer;
     return 0;
+
+fail:
+
+    //try to close the temporary socket
+    if(tmpSocket != -1)
+    {
+      if(close(tmpSocket))
+      {
+        return -1;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * @brief send
+   *
+   * @param payload
+   * @param len)
+   */
+  void ReceiverChannel::send(int sock, const byte *const payload, size_t len)
+  {
+  }
+
+  /**
+   * @brief
+   *
+   * @param alert
+   * @param payload
+   * @param len
+   */
+  void ReceiverChannel::alert(TLS::Alert alert, const byte *const payload,
+      size_t len)
+  {
+  }
+
+  /**
+   * @brief
+   *
+   * @param payload
+   * @param len
+   */
+  void ReceiverChannel::recvData(const byte *const payload, size_t len)
+  {
+  }
+
+  /**
+   * @brief
+   *
+   * @param session
+   *
+   * @return
+   */
+  bool ReceiverChannel::handshake(const TLS::Session &session)
+  {
+    return false;
+  }
+
+  /**
+   * @brief
+   *
+   * @param protocols
+   *
+   * @return
+   */
+  std::string ReceiverChannel::nextProtocol(std::vector<std::string> protocols)
+  {
+    return "";
   }
 
   /**
@@ -129,21 +288,40 @@ namespace Bless
    *
    * @param queue_ parameter to MainConnection::init.
    * @param serverKey_ parameter to MainConnection::init.
-   *
+   * @param receiverKey_ contains the certificate of the Receiver.
    * @return non-zero on failure.
    */
-  int ReceiverMain::init(MessageQueue *queue_, ServerKey *serverKey_)
+  int ReceiverMain::init(MessageQueue *queue_, ServerKey *serverKey_,
+      ConnectionKey *receiverKey_, RandomNumberGenerator *rng_)
   {
+    ::sockaddr_in addr;
+
     //initialize a main connection like normal
     if(MainConnection::init(queue_, serverKey_))
     {
       return -1;
     }
 
-    //allocate a socket, but don't listen on it yet
+    receiverKey = receiverKey_;
+    rng = rng_;
+
+    //allocate a socket
     if((listen = socket(PF_INET, SOCK_DGRAM, 0) == -1))
     {
       return -2;
+    }
+
+    //initialize bind parameters
+    ::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = ::htons(port);
+
+    //bind to udp listen port
+    if(bind(listen, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr))
+        == -1)
+    {
+      close(listen); //ignore error
+      return -3;
     }
 
     return 0;
@@ -154,13 +332,51 @@ namespace Bless
    *
    * pseudocode
    * @code
-   *   listen for a connection
-   *   chan.init(new socket); chan.run();
+   *   listen for a new udp packet
+   *   chan.init(receiver address); chan.run();
    *   while(...) {listen; chan.init(new socket)}
    * @endcode
+   *
+   * peek on the read udp socket; extract the address
+   * any packets are probably new connections from a new Receiver
+   * call and block on channel.init(the read socket)
+   *   channel will reads from the read socket, checking for a 'Client Hello'
+   *   internally channel allocates its own write socket
+   *   it reads and writes until a new dtls connection is made
+   *   on success, it then replaces its server* and socket
+   * if init() fails, the received packet could have been garbage
+   *   decide what to do on the different errors
    */
   void ReceiverMain::run()
   {
+    sockaddr_in receiverAddress;
+    ::socklen_t addrLen;
+
+    while(true)
+    {
+      addrLen = sizeof(receiverAddress);
+      ::memset(&receiverAddress, 0, sizeof(receiverAddress));
+
+      //peek for a `ClientHello` message from a new Receiver
+      if(::recvfrom(
+          listen, nullptr, 0, ::MSG_PEEK,
+          reinterpret_cast<sockaddr *>(&receiverAddress),
+          &addrLen) == -1)
+      {
+        goto fail;
+      }
+
+      //a connection is ready for the channel
+      if(chan.init(listen, receiverAddress, receiverKey, serverKey, *rng))
+      {
+        //XXX: do something more sophisticated- the packet could be ignored
+        goto fail;
+      }
+    }
+
+fail:
+    //XXX: do something with the error
+    return;
   }
 
   /**
@@ -211,6 +427,8 @@ namespace Bless
       KeyStore *store)
   {
     MainConnection::init(queue_, serverKey_);
+
+    return 0;
   }
 
   /**
