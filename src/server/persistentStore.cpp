@@ -20,6 +20,7 @@ namespace Bless
    */
   int FileSystemStore::init(std::string &path)
   {
+    return 0;
   }
 
   /**
@@ -37,6 +38,7 @@ namespace Bless
    */
   int FileSystemStore::isValid(Botan::X509_Certificate const &cert)
   {
+    return -1;
   }
 
   /**
