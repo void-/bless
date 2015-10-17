@@ -308,15 +308,15 @@ namespace Bless
    * init() can be called multiple times as new connections are initiated by
    * the Receiver.
    *
-   * pseudocode
-   * @code
-   *   create and init a dtls server
-   *   init a connection using \p socket
-   *   the first packet should be client hello
-   *   allocate a socket to write to the receiver
-   *   if the connection succeeds, replace channel socket
-   *   replace keys
-   * @endcode
+   * Procedure:
+   * <p>
+   * - allocate a socket
+   * - connect it to \p addr
+   * - allocate sessionManager, policy, and credentials if null
+   * - initialize a new dtls server
+   * - read data from \p socket until the dtls connection is made
+   * - if the connection succeeds, replace the old connection with the new one
+   * </p>
    *
    * \p socket will we read off of, but no reads will occur after init()
    * returns. The lifetime of \p socket just needs to exceed init().
@@ -331,7 +331,8 @@ namespace Bless
       ConnectionKey *receiverKey_, ServerKey *serverKey_,
       RandomNumberGenerator &rng)
   {
-    Botan::TLS::Server *tmpServer;
+    int error = 0;
+    Botan::TLS::Server *tmpServer = nullptr;
     int tmpSocket = -1;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
@@ -340,6 +341,7 @@ namespace Bless
     //allocate a socket to write to
     if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0) == -1))
     {
+      error = -1;
       goto fail;
     }
 
@@ -347,65 +349,86 @@ namespace Bless
     if(::connect(socket, reinterpret_cast<const sockaddr *>(&tmpAddr),
         sizeof(tmpAddr)))
     {
+      error = -2;
       goto fail;
     }
 
-    if(!sessionManager)
+    //only allocate a session manager if it hasn't been before
+    try
     {
-      try
+      if(!policy)
       {
         policy = new ReceiverChannelPolicy();
+      }
+
+      if(!sessionManager)
+      {
         sessionManager = new TLS::Session_Manager_Noop();
+      }
+
+      if(!credentialsManager)
+      {
         auto creds = new ReceiverChannelCredentials();
 
         if(creds->init(serverKey_, receiverKey_))
         {
+          delete creds;
+          error = -3;
           goto fail;
         }
-
         credentialsManager = creds;
       }
-      catch(std::bad_alloc &e)
-      {
-        //couldn't dynamically allocate memory
-        goto fail;
-      }
+    }
+    catch(std::bad_alloc &e)
+    {
+      //couldn't dynamically allocate memory
+      error = -4;
+      goto fail;
     }
 
     //create a new connection using socket
-    tmpServer = new Botan::TLS::Server(
-      //we capture the temporary socket
-      [tmpSocket](const byte *const data, size_t len) {
-        ReceiverChannel::send(tmpSocket, data, len);
-      },
-      [this](const byte *const data, size_t len) {
-        this->recvData(data, len);
-      },
-      [this](TLS::Alert alert, const byte *const payload, size_t len) {
-        this->alert(alert, payload, len);
-      },
-      [this](const TLS::Session &session) {
-        return this->handshake(session);
-      },
-      *sessionManager,
-      *credentialsManager,
-      *policy,
-      rng,
-      [this](std::vector<std::string> proto) {
-        return this->nextProtocol(proto);
-      },
-      true,
-      bufferSize);
+    try
+    {
+      tmpServer = new Botan::TLS::Server(
+        //we capture the temporary socket
+        [tmpSocket](const byte *const data, size_t len) {
+          ReceiverChannel::send(tmpSocket, data, len);
+        },
+        [this](const byte *const data, size_t len) {
+          this->recvData(data, len);
+        },
+        [this](TLS::Alert alert, const byte *const payload, size_t len) {
+          this->alert(alert, payload, len);
+        },
+        [this](const TLS::Session &session) {
+          return this->handshake(session);
+        },
+        *sessionManager,
+        *credentialsManager,
+        *policy,
+        rng,
+        [this](std::vector<std::string> proto) {
+          return this->nextProtocol(proto);
+        },
+        true,
+        bufferSize);
+    }
+    catch(std::bad_alloc &e)
+    {
+      error = -5;
+      goto fail;
+    }
 
     //start up the connection to the candidate Receiver
     while(!tmpServer->is_active())
     {
       //read from the socket param
-      size_t len = ::read(socket, readBuffer, sizeof(readBuffer));
+      auto len = ::read(socket, readBuffer, sizeof(readBuffer));
 
       //failed to read bytes
       if(len <= 0)
       {
+        error = -6;
         goto fail;
       }
       tmpServer->received_data(readBuffer, len);
@@ -436,10 +459,16 @@ fail:
     {
       if(close(tmpSocket))
       {
-        return -1;
+        error = -10;
       }
     }
-    return -1;
+
+    if(tmpServer)
+    {
+      delete tmpServer;
+    }
+
+    return error;
   }
 
   /**
