@@ -579,6 +579,7 @@ fail:
       return -1;
     }
 
+    channelRunning = false;
     receiverKey = receiverKey_;
     rng = rng_;
 
@@ -648,6 +649,17 @@ fail:
       {
         //XXX: do something more sophisticated- the packet could be ignored
         goto fail;
+      }
+
+      //start the channel thread if its not already
+      if(!channelRunning)
+      {
+        if(chan.start())
+        {
+          //couldn't start the channel thread
+          goto fail;
+        }
+        channelRunning = true;
       }
     }
 

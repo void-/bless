@@ -167,6 +167,7 @@ namespace Bless
 
     private:
       ConnectionKey *receiverKey;
+      bool channelRunning;
       ReceiverChannel chan;
       Botan::RandomNumberGenerator *rng;
   };
