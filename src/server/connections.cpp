@@ -587,13 +587,12 @@ fail:
     std::chrono::milliseconds timeout(ReceiverChannel::timeout);
     Message toSend;
 
+    //enter the loop locked
     while(true)
     {
       //wait until a real time message is available or timeout
-      lock.lock();
       if(messageQueue->realTimeSize() == 0)
       {
-        //XXX: timeout below is wrong
         messageQueue->messageReady.wait_for(lock, timeout);
       }
 
@@ -601,6 +600,9 @@ fail:
       toSend = messageQueue->next();
       lock.unlock();
       sendMessage(toSend);
+
+      //lock down here because the loop is entered locked already
+      lock.lock();
     }
   }
 
