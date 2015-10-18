@@ -346,7 +346,7 @@ namespace Bless
     }
 
     //connect the socket to the candidate receiver
-    if(::connect(socket, reinterpret_cast<const sockaddr *>(&tmpAddr),
+    if(::connect(tmpSocket, reinterpret_cast<const sockaddr *>(&tmpAddr),
         sizeof(tmpAddr)))
     {
       error = -2;
@@ -423,6 +423,7 @@ namespace Bless
     while(!tmpServer->is_active())
     {
       //read from the socket param
+      //XXX: make sure each packet received is from \p addr
       auto len = ::read(socket, readBuffer, sizeof(readBuffer));
 
       //failed to read bytes
@@ -608,22 +609,15 @@ fail:
   /**
    * @brief start listening for connections from the Receiver.
    *
-   * pseudocode
-   * @code
-   *   listen for a new udp packet
-   *   chan.init(receiver address); chan.run();
-   *   while(...) {listen; chan.init(new socket)}
-   * @endcode
+   * Procedure
+   * <p>
+   * - peek for a new udp packet
+   * - initialize the channel with the new address
+   * - run the channel if its not already
+   * </p>
    *
-   * peek on the read udp socket; extract the address
-   * any packets are probably new connections from a new Receiver
-   * call and block on channel.init(the read socket)
-   *   channel will reads from the read socket, checking for a 'Client Hello'
-   *   internally channel allocates its own write socket
-   *   it reads and writes until a new dtls connection is made
-   *   on success, it then replaces its server* and socket
-   * if init() fails, the received packet could have been garbage
-   *   decide what to do on the different errors
+   * If init() fails, the received packet could have been garbage
+   *   decide what to do on the different errors.
    */
   void ReceiverMain::run()
   {
