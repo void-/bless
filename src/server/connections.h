@@ -60,6 +60,19 @@ namespace Bless
    *
    * @var Botan::TLS::Server Channel::server
    * @brief TLS connection to another party.
+   *
+   * @var Botan::TLS::Session_Manager Channel::sessionManager
+   * @brief Used by server for managing sessions (which aren't used).
+   *
+   * @var Botan::Credentials_Manager Channel::credentialsManager
+   * @brief Used by server as an interface to serverKey and the expected
+   * certificate of the client.
+   *
+   * @var Botan::TLS::Policy Channel::policy
+   * @brief Used by server for connection parameters.
+   *
+   * @var MessageQueue Channel::messageQueue
+   * @brief message queue to communicate messages from Sender to Receiver.
    */
   class Channel
   {
@@ -77,6 +90,7 @@ namespace Bless
       Botan::TLS::Policy *policy;
       int connection;
       ServerKey *serverKey;
+      MessageQueue *messageQueue;
   };
 
   /**
