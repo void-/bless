@@ -339,7 +339,7 @@ namespace Bless
   {
     int error = 0;
     Botan::TLS::Server *tmpServer = nullptr;
-    int tmpSocket = -1;
+    int tmpSocket;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
     TLS::Server *oldServer;
@@ -438,10 +438,17 @@ namespace Bless
         error = -6;
         goto fail;
       }
-      tmpServer->received_data(readBuffer, len);
+      try
+      {
+        tmpServer->received_data(readBuffer, len);
+      }
+      catch(std::runtime_error &e)
+      {
+        //received data wasn't valid
+        error = -7;
+        goto fail;
+      }
     }
-    //XXX: how do we know if the connection failed?
-    //it probably calls back alert(), which would fail the current connection
 
     receiverKey = receiverKey_;
     serverKey = serverKey_;
