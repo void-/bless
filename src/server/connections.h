@@ -40,6 +40,7 @@ namespace Bless
       virtual ~Runnable();
 
       int start();
+      void join();
 
     protected:
       Runnable() = default;

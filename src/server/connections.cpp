@@ -24,6 +24,14 @@ namespace Bless
   }
 
   /**
+   * @brief block until the underlying threads completes.
+   */
+  void Runnable::join()
+  {
+    t.join();
+  }
+
+  /**
    * @class ReceiverChannelPolicy
    * @brief specifies the connection policy for the message channel.
    *
