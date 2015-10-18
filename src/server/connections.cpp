@@ -498,14 +498,20 @@ fail:
     auto l = ::sendto(connection, payload, len, MSG_NOSIGNAL,
       reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
 
+    //error writing to socket
     if(l < static_cast<decltype(l)>(len))
     {
-      //error writing to socket
+      throw std::runtime_error("send failed");
     }
   }
 
   /**
    * @brief called when a TLS alert is received
+   *
+   * @todo do something with the alert
+   *
+   * Beware that alert() might be called during init() for a different
+   * connection.
    *
    * @param alert
    * @param payload
@@ -523,21 +529,20 @@ fail:
    * This function is a no op, because the Receiver should never send the
    * Server data after the initial connection is made.
    *
-   * @param payload
-   * @param len
+   * @param payload not used.
+   * @param len not used.
    */
-  void ReceiverChannel::recvData(const byte *const payload, size_t len)
+  void ReceiverChannel::recvData(const byte *const, size_t)
   {
   }
 
   /**
    * @brief called when a handshake is created from Receiver to Server.
    *
-   * @param session
-   *
-   * @return
+   * @param session not used.
+   * @return false, don't cache the session
    */
-  bool ReceiverChannel::handshake(const TLS::Session &session)
+  bool ReceiverChannel::handshake(const TLS::Session &)
   {
     return false;
   }
