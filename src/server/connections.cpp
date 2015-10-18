@@ -345,7 +345,7 @@ namespace Bless
     TLS::Server *oldServer;
 
     //allocate a socket to write to
-    if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0) == -1))
+    if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0)) == -1)
     {
       error = -1;
       goto fail;
@@ -632,7 +632,7 @@ fail:
     rng = rng_;
 
     //allocate a socket
-    if((listen = socket(PF_INET, SOCK_DGRAM, 0) == -1))
+    if((listen = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
     {
       return -2;
     }
@@ -640,6 +640,7 @@ fail:
     //initialize bind parameters
     ::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
     addr.sin_port = ::htons(port);
 
     //bind to udp listen port
