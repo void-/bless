@@ -323,13 +323,18 @@ namespace Bless
    *
    * @param socket borrowed udp socket that dtls connection initialization
    *   packets are read from, but not written to.
-   * @param receiver socket information about \p socket.
-   * @param client ConectionKey containing the Receiver's certificate.
+   * @param addr socket information about \p socket.
+   * @param receiverKey_ ConectionKey containing the Receiver's certificate.
+   * @param serverKey_ serverKey containing the Server's certificate to the
+   *   Receiver.
+   * @param messageQueue_ used to communicate messages from SenderChannel to be
+   *   sent to the Receiver.
+   * @param rng random number generator to use for the connection.
    * @return non-zero on failure.
    */
   int ReceiverChannel::init(int &socket, sockaddr_in addr,
       ConnectionKey *receiverKey_, ServerKey *serverKey_,
-      RandomNumberGenerator &rng)
+      MessageQueue *messageQueue_, RandomNumberGenerator &rng)
   {
     int error = 0;
     Botan::TLS::Server *tmpServer = nullptr;
@@ -443,8 +448,9 @@ namespace Bless
     //if the connection succeeds, shutdown and replace the current connection
     oldServer = server;
 
-    //writes are atomic, so no sync is needed
+    //writes are atomic, so no sync is needed; but be careful
     server = tmpServer;
+    messageQueue = messageQueue_;
 
     if(oldServer)
     {
@@ -545,6 +551,15 @@ fail:
    *
    * The socket used to connect to the Reciever may be updated via init() when
    * the Receiver moves.
+   *
+   * @warning init() should be called atleast once before run()
+   * @invariant ReceiverChannel::server is not null
+   *
+   * Procedure:
+   * <p>
+   * - sleep on the MessageQueue waiting at most timeout milliseconds
+   * - take a message off the queue and send it to the Receiver
+   * </p>
    */
   void ReceiverChannel::run()
   {
@@ -639,7 +654,8 @@ fail:
       }
 
       //a connection is ready for the channel
-      if(chan.init(listen, receiverAddress, receiverKey, serverKey, *rng))
+      if(chan.init(listen, receiverAddress, receiverKey, serverKey, queue,
+          *rng))
       {
         //XXX: do something more sophisticated- the packet could be ignored
         goto fail;

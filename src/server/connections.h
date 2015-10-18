@@ -136,8 +136,14 @@ namespace Bless
    * There should only be one instance of ReceiverChannel. It should be
    * allocated on a controlling thread.
    *
-   * @var ConnectionKey *ReceiverChannel::clientKey
+   * @var ConnectionKey *ReceiverChannel::receiverKey
    * @brief ConnectionKey containing the expected certificate for the Receiver.
+   *
+   * @var size_t ReceiverChannel::bufferSize
+   * @brief size, in bytes, of the buffer to use for the DTLS connection.
+   *
+   * @var unsigned RecieverChannel::timeout
+   * @brief length, in milliseconds, to wait between sending a message.
    */
   class ReceiverChannel : public Channel, public Runnable
   {
@@ -145,7 +151,8 @@ namespace Bless
       ReceiverChannel();
       ~ReceiverChannel();
       int init(int &socket, sockaddr_in addr, ConnectionKey *receiverKey_,
-        ServerKey *serverKey_, Botan::RandomNumberGenerator &rng);
+        ServerKey *serverKey_, MessageQueue *messageQueue_,
+        Botan::RandomNumberGenerator &rng);
 
     protected:
       static void send(int sock, const Botan::byte *const payload, size_t len);
@@ -159,6 +166,7 @@ namespace Bless
       ConnectionKey *receiverKey;
 
       static const size_t bufferSize = 4096;
+      static const unsigned timeout = 30*1000;
   };
 
   /**
