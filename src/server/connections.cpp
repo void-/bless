@@ -453,7 +453,7 @@ fail:
   {
     auto l = ::send(sock, payload, len, MSG_NOSIGNAL);
 
-    if(l < len)
+    if(l < static_cast<decltype(l)>(len))
     {
       //error writing to socket
     }
