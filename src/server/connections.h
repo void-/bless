@@ -156,11 +156,14 @@ namespace Bless
 
     protected:
       static void send(int sock, const Botan::byte *const payload, size_t len);
+
       void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
         size_t len);
       void recvData(const Botan::byte *const payload, size_t len);
       bool handshake(const Botan::TLS::Session &session);
       std::string nextProtocol(std::vector<std::string> protocols);
+
+      void sendMessage(Message &m);
 
       void run() override;
       ConnectionKey *receiverKey;

@@ -1,4 +1,5 @@
 #include "connections.h"
+#include <chrono> //for duration
 
 using namespace Botan;
 
@@ -547,6 +548,18 @@ fail:
   }
 
   /**
+   * @brief send a Message \p m to the Receiver over the message channel.
+   *
+   * This abstracts serializing the message and actually sending it, incase
+   * this needs to be mocked out.
+   *
+   * @param m the message to send.
+   */
+  void ReceiverChannel::sendMessage(Message &m)
+  {
+  }
+
+  /**
    * @brief preform the main logic of maintaining a connection to the Receiver.
    *
    * The socket used to connect to the Reciever may be updated via init() when
@@ -563,6 +576,25 @@ fail:
    */
   void ReceiverChannel::run()
   {
+    std::unique_lock<std::mutex> lock(messageQueue->realTimeLock);
+    std::chrono::milliseconds timeout(ReceiverChannel::timeout);
+    Message toSend;
+
+    while(true)
+    {
+      //wait until a real time message is available or timeout
+      lock.lock();
+      if(messageQueue->realTimeSize() == 0)
+      {
+        //XXX: timeout below is wrong
+        messageQueue->messageReady.wait_for(lock, timeout);
+      }
+
+      //get the next message from the queue
+      toSend = messageQueue->next();
+      lock.unlock();
+      sendMessage(toSend);
+    }
   }
 
   /**
