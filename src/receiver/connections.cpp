@@ -394,6 +394,7 @@ fail:
       if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
           (pollSocket.revents & POLLNVAL))
       {
+        //could have received ICMP unreachable
         return pollSocket.revents;
       }
 
