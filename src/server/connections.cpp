@@ -565,6 +565,8 @@ fail:
    */
   void ReceiverChannel::sendMessage(Message &m)
   {
+    //TEST
+    server->send("Hello, World!");
   }
 
   /**
