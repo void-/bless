@@ -21,11 +21,11 @@
 
 using namespace Bless;
 
-std::string defaultServerSenderKey = RESOURCE_PATH"senderKey.pem";
-std::string defaultServerSenderCert = RESOURCE_PATH"sender.pem";
-std::string defaultServerReceiverKey = RESOURCE_PATH"recvKey.pem";
-std::string defaultServerReceiverCert = RESOURCE_PATH"receiver.pem";
-std::string defaultReceiverCert = RESOURCE_PATH"receiver.pem";
+std::string defaultServerSenderKey = RESOURCE_PATH"server.pem";
+std::string defaultServerSenderCert = RESOURCE_PATH"serverCert.pem";
+std::string defaultServerReceiverKey = RESOURCE_PATH"server.pem";
+std::string defaultServerReceiverCert = RESOURCE_PATH"serverCert.pem";
+std::string defaultReceiverCert = RESOURCE_PATH"receiverCert.pem";
 std::string defaultSenderCert = RESOURCE_PATH;
 
 std::mutex exitLock;
@@ -122,8 +122,10 @@ int main(int argc, char **argv)
   }
 
   //wait until its time to exit
-  waitLock = std::unique_lock<std::mutex>(exitLock);
-  mainExit.wait(waitLock);
+  //waitLock = std::unique_lock<std::mutex>(exitLock);
+  //mainExit.wait(waitLock);
+
+  recv.join();
 
 fail:
   return error;
