@@ -155,9 +155,9 @@ namespace Bless
           const std::string &,
           const std::vector<X509_Certificate> &certChain) override
       {
-        if(type != "tls-client")
+        if(type != "tls-server")
         {
-          throw std::runtime_error("Must use for tls-client.");
+          throw std::runtime_error("Must use for tls-server.");
         }
 
         if(!(certChain.size() == 1 &&
@@ -184,9 +184,9 @@ namespace Bless
           &, const std::string &type, const std::string &)
           override
       {
-        if(type != "tls-client")
+        if(type != "tls-server")
         {
-          throw std::runtime_error("Must use for tls-client.");
+          throw std::runtime_error("Must use for tls-server.");
         }
         auto cert = serverKey->getCert();
         return std::vector<X509_Certificate>{*cert};
@@ -205,9 +205,9 @@ namespace Bless
       Private_Key *private_key_for(const X509_Certificate &cert,
           const std::string &type, const std::string &) override
       {
-        if(type != "tls-client")
+        if(type != "tls-server")
         {
-          throw std::runtime_error("Must use for tls-client.");
+          throw std::runtime_error("Must use for tls-server.");
         }
 
         //if the cert is the Receiver's, return the private key
