@@ -61,13 +61,13 @@ struct ListenArgs
 
   static const std::string defaultReceiverCertFile;
   static const std::string defaultServerCertFile;
-  static const unsigned short defaultPort = 8675;
+  static const unsigned short defaultPort = 9549;
 };
 
 const std::string ListenArgs::defaultReceiverCertFile =
-  RESOURCE_PATH"receiver.pem";
+  RESOURCE_PATH"receiverCert.pem";
 const std::string ListenArgs::defaultServerCertFile =
-  RESOURCE_PATH"server.pem";
+  RESOURCE_PATH"serverCert.pem";
 
 /**
  * @brief parse the arguments passed into main().
@@ -199,10 +199,11 @@ fail:
  */
 int getMessage(unsigned char const *const payload, std::size_t len)
 {
-    for(size_t i = 0; i < len; ++i)
+    for(std::size_t i = 0; i < len; ++i)
     {
       std::cout << payload[i];
     }
+    std::cout.flush();
 
     return 0;
 }
