@@ -72,6 +72,9 @@ namespace Bless
    * @var Botan::TLS::Policy Channel::policy
    * @brief Used by server for connection parameters.
    *
+   * @var Botan::RandomNumberGenerator Channel::rng
+   * @brief Random number generator used to make a connection.
+   *
    * @var MessageQueue Channel::messageQueue
    * @brief message queue to communicate messages from Sender to Receiver.
    */
@@ -80,7 +83,8 @@ namespace Bless
     public:
       Channel(const Channel &) = delete;
       virtual ~Channel();
-      int init(int socket, sockaddr_in addr, ServerKey *server);
+      int init(int socket, ServerKey *serverKey_, MessageQueue *messageQueue_,
+        Botan::RandomNumberGenerator *rng_);
 
     protected:
       Channel();
@@ -89,6 +93,8 @@ namespace Bless
       Botan::TLS::Session_Manager *sessionManager;
       Botan::Credentials_Manager *credentialsManager;
       Botan::TLS::Policy *policy;
+      Botan::RandomNumberGenerator *rng;
+
       int connection;
       ServerKey *serverKey;
       MessageQueue *messageQueue;
@@ -151,12 +157,12 @@ namespace Bless
     public:
       ReceiverChannel();
       ~ReceiverChannel();
-      int init(int &socket, sockaddr_in addr, ConnectionKey *receiverKey_,
-        ServerKey *serverKey_, MessageQueue *messageQueue_,
-        Botan::RandomNumberGenerator &rng);
+      int init(int &socket, ConnectionKey *receiverKey_, ServerKey *serverKey_,
+        MessageQueue *messageQueue_, Botan::RandomNumberGenerator *rng);
+      int connect(sockaddr_in addr);
 
     protected:
-      static void send(int sock, const Botan::byte *const payload, size_t len);
+      void send(sockaddr_in dest, const Botan::byte *const payload, size_t len);
 
       void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
         size_t len);

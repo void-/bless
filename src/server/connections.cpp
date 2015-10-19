@@ -257,13 +257,20 @@ namespace Bless
    * Use this in subclasses of channel to avoid repeated lines.
    *
    * @param socket the socket descriptor for the connection.
-   * @param addr the address of the counterparty.
-   * @param server ServerKey containing the Server's certificate and private
-   *   key.
+   * @param serverKey_ contains the Server's certificate and private
+   *   key to the counterparty.
+   * @param messageQueue_ used to communicate messages from SenderChannel to be
+   *   sent to the Receiver.
    * @return non-zero on failure.
    */
-  int Channel::init(int socket, sockaddr_in addr, ServerKey *server)
+  int Channel::init(int socket, ServerKey *serverKey_,
+      MessageQueue *messageQueue_, RandomNumberGenerator *rng_)
   {
+    connection = socket;
+    serverKey = serverKey_;
+    messageQueue = messageQueue_;
+    rng = rng_;
+
     return 0;
   }
 
@@ -314,99 +321,93 @@ namespace Bless
   /**
    * @brief initialize a ReceiverChannel to the Receiver.
    *
-   * init() can be called multiple times as new connections are initiated by
-   * the Receiver.
-   *
-   * Procedure:
-   * <p>
-   * - allocate a socket
-   * - connect it to \p addr
-   * - allocate sessionManager, policy, and credentials if null
-   * - initialize a new dtls server
-   * - read data from \p socket until the dtls connection is made
-   * - if the connection succeeds, replace the old connection with the new one
-   * </p>
-   *
    * \p socket will we read off of, but no reads will occur after init()
-   * returns. The lifetime of \p socket just needs to exceed init().
+   * returns. It will be further used to send packets, but won't be connected
+   * to any destination.
    *
-   * @param socket borrowed udp socket that dtls connection initialization
-   *   packets are read from, but not written to.
-   * @param addr socket information about \p socket.
+   * @param socket borrowed udp socket that is bound to the listening port, but
+   *   not connected to any destination.
    * @param receiverKey_ ConectionKey containing the Receiver's certificate.
    * @param serverKey_ serverKey containing the Server's certificate to the
    *   Receiver.
    * @param messageQueue_ used to communicate messages from SenderChannel to be
    *   sent to the Receiver.
    * @param rng random number generator to use for the connection.
+   *
    * @return non-zero on failure.
    */
-  int ReceiverChannel::init(int &socket, sockaddr_in addr,
-      ConnectionKey *receiverKey_, ServerKey *serverKey_,
-      MessageQueue *messageQueue_, RandomNumberGenerator &rng)
+  int ReceiverChannel::init(int &socket, ConnectionKey *receiverKey_,
+      ServerKey *serverKey_, MessageQueue *messageQueue_,
+      RandomNumberGenerator *rng_)
   {
     int error = 0;
-    Botan::TLS::Server *tmpServer = nullptr;
-    int tmpSocket;
-    sockaddr_in tmpAddr = addr;
-    unsigned char readBuffer[bufferSize];
-    TLS::Server *oldServer;
 
-    //allocate a socket to write to
-    if((tmpSocket = ::socket(PF_INET, SOCK_DGRAM, 0)) == -1)
+    if((error = Channel::init(socket, serverKey_, messageQueue_, rng_)))
     {
-      error = -1;
       goto fail;
     }
 
-    //connect the socket to the candidate receiver
-    if(::connect(tmpSocket, reinterpret_cast<const sockaddr *>(&tmpAddr),
-        sizeof(tmpAddr)))
-    {
-      error = -2;
-      goto fail;
-    }
+    receiverKey = receiverKey_;
 
-    //only allocate a session manager if it hasn't been before
+    //allocate tls server objects
     try
     {
-      if(!policy)
-      {
-        policy = new ReceiverChannelPolicy();
-      }
+      policy = new ReceiverChannelPolicy();
+      sessionManager = new TLS::Session_Manager_Noop();
+      auto creds = new ReceiverChannelCredentials();
 
-      if(!sessionManager)
+      if(creds->init(serverKey_, receiverKey_))
       {
-        sessionManager = new TLS::Session_Manager_Noop();
+        error = -1;
+        goto fail;
       }
-
-      if(!credentialsManager)
-      {
-        auto creds = new ReceiverChannelCredentials();
-
-        if(creds->init(serverKey_, receiverKey_))
-        {
-          delete creds;
-          error = -3;
-          goto fail;
-        }
-        credentialsManager = creds;
-      }
+      credentialsManager = creds;
     }
     catch(std::bad_alloc &e)
     {
       //couldn't dynamically allocate memory
-      error = -4;
+      error = -2;
       goto fail;
     }
+
+fail:
+    return error;
+  }
+
+  /**
+   * @brief connect the ReceiverChannel to a candidate Receiver at \p addr.
+   *
+   * connect() can be called multiple times as new connections are initiated by
+   * the Receiver.
+   *
+   * If making a dtls connection to \p addr fails, ReceiverChannel is not
+   * modified.
+   *
+   * Procedure:
+   * <p>
+   * - initialize a new dtls server
+   * - read data from socket until the dtls connection is made
+   * - if the connection succeeds, replace the old connection with the new one
+   * </p>
+   *
+   * @param addr socket information about \p socket.
+   * @return non-zero on failure.
+   */
+  int ReceiverChannel::connect(sockaddr_in addr)
+  {
+    int error = 0;
+    Botan::TLS::Server *tmpServer = nullptr;
+    sockaddr_in tmpAddr = addr;
+    unsigned char readBuffer[bufferSize];
+    TLS::Server *oldServer;
 
     //create a new connection using socket
     try
     {
       tmpServer = new Botan::TLS::Server(
-        //we capture the temporary socket
-        [tmpSocket](const byte *const data, size_t len) {
-          ReceiverChannel::send(tmpSocket, data, len);
+        //we capture the candidate address
+        [this, tmpAddr](const byte *const data, size_t len) {
+          this->send(tmpAddr, data, len);
         },
         [this](const byte *const data, size_t len) {
           this->recvData(data, len);
@@ -420,7 +421,7 @@ namespace Bless
         *sessionManager,
         *credentialsManager,
         *policy,
-        rng,
+        *rng,
         [this](std::vector<std::string> proto) {
           return this->nextProtocol(proto);
         },
@@ -436,9 +437,9 @@ namespace Bless
     //start up the connection to the candidate Receiver
     while(!tmpServer->is_active())
     {
-      //read from the socket param
+      //read bytes from the candidate Receiver
       //XXX: make sure each packet received is from \p addr
-      auto len = ::read(socket, readBuffer, sizeof(readBuffer));
+      auto len = ::read(connection, readBuffer, sizeof(readBuffer));
 
       //failed to read bytes
       if(len <= 0)
@@ -446,6 +447,8 @@ namespace Bless
         error = -6;
         goto fail;
       }
+
+      //give the data to the server
       try
       {
         tmpServer->received_data(readBuffer, len);
@@ -458,15 +461,11 @@ namespace Bless
       }
     }
 
-    receiverKey = receiverKey_;
-    serverKey = serverKey_;
-
     //if the connection succeeds, shutdown and replace the current connection
     oldServer = server;
 
     //writes are atomic, so no sync is needed; but be careful
     server = tmpServer;
-    messageQueue = messageQueue_;
 
     if(oldServer)
     {
@@ -477,14 +476,6 @@ namespace Bless
 
     //if the connection fails; don't modify anything
 fail:
-    //try to close the temporary socket
-    if(tmpSocket != -1)
-    {
-      if(close(tmpSocket))
-      {
-        error = -10;
-      }
-    }
 
     if(tmpServer)
     {
@@ -497,13 +488,15 @@ fail:
   /**
    * @brief send write \p len bytes of \p payload to udp socket \p sock.
    *
-   * @param sock the udp socket to write out to.
+   * @param addr the Receiver address to send to.
    * @param payload data to write to \p sock.
    * @param len length, in bytes, of \p sock.
    */
-  void ReceiverChannel::send(int sock, const byte *const payload, size_t len)
+  void ReceiverChannel::send(sockaddr_in addr, const byte *const payload,
+      size_t len)
   {
-    auto l = ::send(sock, payload, len, MSG_NOSIGNAL);
+    auto l = ::sendto(connection, payload, len, MSG_NOSIGNAL,
+      reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
 
     if(l < static_cast<decltype(l)>(len))
     {
@@ -668,6 +661,12 @@ fail:
       return -3;
     }
 
+    //initialize the channel, but don't connect or run it
+    if(chan.init(listen, receiverKey, serverKey, queue, rng))
+    {
+      return -4;
+    }
+
     return 0;
   }
 
@@ -681,7 +680,7 @@ fail:
    * - run the channel if its not already
    * </p>
    *
-   * If init() fails, the received packet could have been garbage
+   * If connect() fails, the received packet could have been garbage
    *   decide what to do on the different errors.
    */
   void ReceiverMain::run()
@@ -703,9 +702,8 @@ fail:
         goto fail;
       }
 
-      //a connection is ready for the channel
-      if(chan.init(listen, receiverAddress, receiverKey, serverKey, queue,
-          *rng))
+      //a connection is ready for the channel, try to connect to it
+      if(chan.connect(receiverAddress))
       {
         //XXX: do something more sophisticated- the packet could be ignored
         goto fail;
