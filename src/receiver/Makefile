@@ -1,6 +1,6 @@
 CXX = g++
 CPPFLAGS = -std=c++11 -Wall -Wextra -g
-LDFLAGS = -lbotan-1.11
+LDFLAGS = -lbotan-1.11 -lpthread
 BIN = "listen"
 
 RM = rm -f
