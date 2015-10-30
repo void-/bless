@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 
 #include <thread>
+#include <mutex>
 #include <list>
 
 #include <botan/tls_server.h>
@@ -146,6 +147,9 @@ namespace Bless
    * @var ConnectionKey *ReceiverChannel::receiverKey
    * @brief ConnectionKey containing the expected certificate for the Receiver.
    *
+   * @var std::mutex ReceiverChannel::serverLock
+   * @brief lock to update Channel::server during connect().
+   *
    * @var size_t ReceiverChannel::bufferSize
    * @brief size, in bytes, of the buffer to use for the DTLS connection.
    *
@@ -162,7 +166,8 @@ namespace Bless
       int connect(sockaddr_in addr);
 
     protected:
-      void send(sockaddr_in dest, const Botan::byte *const payload, size_t len);
+      void send(sockaddr_in dest, const Botan::byte *const payload,
+        size_t len);
 
       void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
         size_t len);
@@ -174,6 +179,7 @@ namespace Bless
 
       void run() override;
       ConnectionKey *receiverKey;
+      std::mutex serverLock;
 
       static const size_t bufferSize = 4096;
       static const unsigned timeout = 30*1000;
@@ -194,7 +200,7 @@ namespace Bless
         ConnectionKey *receiverKey_, Botan::RandomNumberGenerator *rng_);
       void run() override;
 
-      static const int backlog = 1;
+      static const int timeout = 2000;
       static const unsigned short port = 9549;
 
     private:

@@ -399,6 +399,7 @@ fail:
     Botan::TLS::Server *tmpServer = nullptr;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
+    std::unique_lock<std::mutex> lock;
     TLS::Server *oldServer;
 
     //create a new connection using socket
@@ -464,12 +465,15 @@ fail:
     //if the connection succeeds, shutdown and replace the current connection
     oldServer = server;
 
-    //writes are atomic, so no sync is needed; but be careful
+    //lock to safely update server
+    lock = std::unique_lock<std::mutex>(serverLock);
     server = tmpServer;
+    lock.unlock();
 
+    //don't lock to delete
     if(oldServer)
     {
-      server->close();
+      oldServer->close();
       delete oldServer;
     }
     return 0;
@@ -566,12 +570,16 @@ fail:
    * This abstracts serializing the message and actually sending it, incase
    * this needs to be mocked out.
    *
+   * Lock serverLock to access a safe copy of server.
+   *
    * @param m the message to send.
    */
   void ReceiverChannel::sendMessage(Message &m)
   {
+    std::unique_lock<std::mutex> lock(serverLock);
     //TEST
     server->send("Hello, World!");
+    lock.unlock();
   }
 
   /**
