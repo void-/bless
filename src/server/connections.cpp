@@ -1,5 +1,8 @@
 #include "connections.h"
+
 #include <chrono> //for duration
+
+#include <poll.h>
 
 using namespace Botan;
 
@@ -397,6 +400,7 @@ fail:
   {
     int error = 0;
     Botan::TLS::Server *tmpServer = nullptr;
+    ::pollfd pollSocket;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
     std::unique_lock<std::mutex> lock;
@@ -435,16 +439,37 @@ fail:
       goto fail;
     }
 
+    //set up socket for polling
+    pollSocket.fd = connection;
+    pollSocket.events = POLLIN; //poll for reading
+
     //start up the connection to the candidate Receiver
     while(!tmpServer->is_active())
     {
+      //wait at most 2 seconds-the Receiver could be fake
+      if(::poll(&pollSocket, 1u, timeout) != 1)
+      {
+        error = -8;
+        goto fail;
+      }
+
+      //error on socket
+      if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
+          (pollSocket.revents & POLLNVAL))
+      {
+        //could have received ICMP unreachable
+        error = -pollSocket.revents;
+        goto fail;
+      }
+
       //read bytes from the candidate Receiver
-      //XXX: make sure each packet received is from \p addr
       auto len = ::read(connection, readBuffer, sizeof(readBuffer));
 
-      //failed to read bytes
+      //XXX: make sure each packet received is from \p addr
+
       if(len <= 0)
       {
+        //poll() lied!
         error = -6;
         goto fail;
       }
