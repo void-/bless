@@ -70,9 +70,13 @@ namespace Bless
    * @var size_t Channel::bufferSize
    * @brief the size, in bytes, used for stack-allocated buffers
    *
-   * @var int Channel::timeout
+   * @var int Channel::handshakeTimeout
    * @brief the number of milliseconds to timeout at when handshaking the DTLS
    *   connection
+   *
+   * @var int Channel::channelTimeout
+   * @brief the maximum length of time, in milliseconds, to wait between
+   *   channel messages before the message channel is considered stale
    *
    * @var Channel::recvCallback
    * @brief callback when an authenticated message comes in.
@@ -112,7 +116,8 @@ namespace Bless
       bool handshake(const Botan::TLS::Session &session);
 
       static const size_t bufferSize = 4096;
-      static const int timeout = 1000;
+      static const int handshakeTimeout = 1 * 1000;
+      static const int channelTimeout = 30 * 1000;
 
     private:
       AuthKeys *authKeys;

@@ -385,7 +385,7 @@ fail:
     while(!client->is_active())
     {
       //not ready after 1 second
-      if(::poll(&pollSocket, 1u, timeout) != 1)
+      if(::poll(&pollSocket, 1u, handshakeTimeout) != 1)
       {
         return -2;
       }
@@ -429,18 +429,38 @@ fail:
    */
   int Channel::listen()
   {
+    ::pollfd pollSocket;
     unsigned char readBuffer[bufferSize];
+
+    //set up socket for polling
+    pollSocket.fd = connection;
+    pollSocket.events = POLLIN; //poll for reading
 
     //read while client is still up
     while(client->is_active())
     {
+      //after 30 seconds - the holepunch is closed
+      if(::poll(&pollSocket, 1u, channelTimeout) != 1)
+      {
+        return -1;
+      }
+
+      //error on socket
+      if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
+          (pollSocket.revents & POLLNVAL))
+      {
+        //could have received ICMP unreachable
+        return pollSocket.revents;
+      }
+
       //block until bytes are ready to read
       ssize_t count = read(connection, readBuffer, sizeof(readBuffer));
 
       //check if read failed
       if(count <= 0)
       {
-        return -1;
+        //poll() lied!
+        return -3;
       }
 
       //give read data to client
