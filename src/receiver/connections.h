@@ -117,7 +117,7 @@ namespace Bless
 
       static const size_t bufferSize = 4096;
       static const int handshakeTimeout = 1 * 1000;
-      static const int channelTimeout = 30 * 1000;
+      static const int channelTimeout = 120 * 1000;
 
     private:
       AuthKeys *authKeys;
