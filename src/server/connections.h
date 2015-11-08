@@ -225,6 +225,22 @@ namespace Bless
   };
 
   /**
+   * @struct ChannelWork
+   * @brief a single work item for a SenderChannel thread to process.
+   *
+   * @var int ChannelWork::conn
+   * @brief socket connected to a Sender
+   *
+   * @var sockaddr_in ChannelWork::sender
+   * @brief the address of the Sender
+   */
+  struct ChannelWork
+  {
+    int conn;
+    sockaddr_in sender;
+  };
+
+  /**
    * @class SenderChannel
    * @brief store state for the connection to a Sender; this should run on its
    *   own thread.
@@ -267,8 +283,11 @@ namespace Bless
    * @var int SenderMain::backlog
    * @brief number of waiting connections when listening for Senders.
    *
-   * @var std::list<SenderChannel> SenderMain::channels
-   * @brief list of all active connections to Senders.
+   * @var unsigned int SenderMain::maxThreads
+   * @brief the maximum number of threads to have allocated at once.
+   *
+   * @var std::array<SenderChannel, maxThreads> SenderMain::channels
+   * @brief fixed array of SenderChannels to handle connections.
    */
   class SenderMain : public Runnable, public MainConnection
   {
@@ -283,9 +302,15 @@ namespace Bless
     protected:
       void run() override;
       static const int backlog = 32;
+      static const unsigned int maxThreads = 2;
 
     private:
-      std::list<SenderChannel> channels;
+      KeyStore *store;
+
+      std::array<SenderChannel, maxThreads> channels;
+      std::mutex workLock;
+      std::condition_variable workReady;
+      std::queue<ChannelWork> connections;
   };
 }
 
