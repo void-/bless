@@ -101,7 +101,7 @@ int main(int argc, char **argv)
   }
 
   //initialize thread for handling connections to Sender
-  if((error = sender.init(&messages, &keyToSender, &store)))
+  if((error = sender.init(&messages, &keyToSender, &store, &rng)))
   {
     std::cerr << "Failed to initialize Sender main." << std::endl;
     goto fail;

@@ -300,12 +300,14 @@ namespace Bless
    *   to.
    * @param serverKey_ contains certificate and private key for connections to
    *   either Senders or the Receiver.
+   * @param rng_ random number generator needed for d/tls connections.
    * @return non-zero on failure.
    */
-  int MainConnection::init(MessageQueue *queue_, ServerKey *serverKey_)
+  int MainConnection::init(MessageQueue *queue_, ServerKey *serverKey_, RandomNumberGenerator *rng_)
   {
     queue = queue_;
     serverKey = serverKey_;
+    rng = rng_;
 
     return 0;
   }
@@ -669,6 +671,7 @@ fail:
    * @param queue_ parameter to MainConnection::init.
    * @param serverKey_ parameter to MainConnection::init.
    * @param receiverKey_ contains the certificate of the Receiver.
+   * @param rng_ parameter to MainConnection::init.
    * @return non-zero on failure.
    */
   int ReceiverMain::init(MessageQueue *queue_, ServerKey *serverKey_,
@@ -677,14 +680,13 @@ fail:
     ::sockaddr_in addr;
 
     //initialize a main connection like normal
-    if(MainConnection::init(queue_, serverKey_))
+    if(MainConnection::init(queue_, serverKey_, rng_))
     {
       return -1;
     }
 
     channelRunning = false;
     receiverKey = receiverKey_;
-    rng = rng_;
 
     //allocate a socket
     if((listen = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
@@ -817,22 +819,25 @@ fail:
    *
    * @param queue_ parameter to MainConnection::init.
    * @param serverKey_ parameter to MainConnection::init.
-   * @param store KeyStore that stores Sender certificates.
+   * @param store_ KeyStore that stores Sender certificates.
+   * @param rng_ parameter to MainConnection::init.
    * @return non-zero on failure.
    */
   int SenderMain::init(MessageQueue *queue_, ServerKey *serverKey_,
-      KeyStore *store)
+      KeyStore *store_, RandomNumberGenerator *rng_)
   {
     ::sockaddr_in addr;
     int sockOption = 1;
     int error;
 
     //initialize a main connection
-    if(MainConnection::init(queue_, serverKey_))
+    if(MainConnection::init(queue_, serverKey_, rng_))
     {
       error = -1;
       goto fail;
     }
+
+    store = store_;
 
     //allocate a tcp socket
     if((listen = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)

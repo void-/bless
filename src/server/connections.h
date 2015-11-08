@@ -123,7 +123,8 @@ namespace Bless
   {
     public:
       virtual ~MainConnection();
-      int init(MessageQueue *queue_, ServerKey *serverKey_);
+      int init(MessageQueue *queue_, ServerKey *serverKey_,
+        Botan::RandomNumberGenerator *rng_);
 
     protected:
       MainConnection() = default;
@@ -131,6 +132,7 @@ namespace Bless
       int listen;
       MessageQueue *queue;
       ServerKey *serverKey;
+      Botan::RandomNumberGenerator *rng;
   };
 
   /**
@@ -220,7 +222,6 @@ namespace Bless
       ConnectionKey *receiverKey;
       bool channelRunning;
       ReceiverChannel chan;
-      Botan::RandomNumberGenerator *rng;
   };
 
   /**
@@ -275,7 +276,7 @@ namespace Bless
       SenderMain() = default;
       ~SenderMain();
       int init(MessageQueue *queue_, ServerKey *serverKey_,
-        KeyStore *store);
+        KeyStore *store_, Botan::RandomNumberGenerator *rng_);
 
       static const unsigned short port = 9548;
 
