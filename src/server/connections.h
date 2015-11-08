@@ -263,6 +263,9 @@ namespace Bless
    * @var unsigned short SenderMain::port
    * @brief tcp port used to listen for connections from Senders.
    *
+   * @var int SenderMain::backlog
+   * @brief number of waiting connections when listening for Senders.
+   *
    * @var std::list<SenderChannel> SenderMain::channels
    * @brief list of all active connections to Senders.
    */
@@ -278,6 +281,7 @@ namespace Bless
 
     protected:
       void run() override;
+      static const int backlog = 32;
 
     private:
       std::list<SenderChannel> channels;
