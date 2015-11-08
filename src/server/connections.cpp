@@ -808,14 +808,68 @@ fail:
   /**
    * @brief initialize a Sender main thread.
    *
+   * @see MainConnection::init()
+   *
+   * @param queue_ parameter to MainConnection::init.
+   * @param serverKey_ parameter to MainConnection::init.
    * @param store KeyStore that stores Sender certificates.
+   * @return non-zero on failure.
    */
   int SenderMain::init(MessageQueue *queue_, ServerKey *serverKey_,
       KeyStore *store)
   {
-    MainConnection::init(queue_, serverKey_);
+    ::sockaddr_in addr;
+    int sockOption = 1;
+    int error;
+
+    //initialize a main connection
+    if(MainConnection::init(queue_, serverKey_))
+    {
+      error = -1;
+      goto fail;
+    }
+
+    //allocate a tcp socket
+    if((listen = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
+    {
+      error = -2;
+      goto fail;
+    }
+
+    //set socket options
+    if(::setsockopt(listen, SOL_SOCKET, SO_REUSEADDR, &sockOption,
+        sizeof(sockOption)) == -1)
+    {
+      error = -3;
+      goto fail;
+    }
+
+    //initialize bind parameters
+    ::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = ::htons(port);
+
+    //bind to tcp listen port
+    if(::bind(listen, reinterpret_cast<const sockaddr *>(&addr), sizeof(addr))
+        == -1)
+    {
+      error = -4;
+      goto fail;
+    }
+
+    //set the socket to listen, but don't accept yet
+    if(::listen(listen, backlog) == -1)
+    {
+      error = -5;
+      goto fail;
+    }
 
     return 0;
+
+fail:
+    close(listen); //ignore error
+    return error;
   }
 
   /**
