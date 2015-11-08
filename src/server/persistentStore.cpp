@@ -1,5 +1,10 @@
 #include "persistentStore.h"
 
+#include <sys/types.h> //for opendir
+#include <dirent.h>
+
+using namespace Botan;
+
 namespace Bless
 {
   /**
@@ -15,12 +20,69 @@ namespace Bless
    * The directory as \p path needs to be opened and the certificates loaded
    * into the stagedIn list.
    *
-   * @param path the directory path to load certificates from.
+   * Load in every certificate from \p path_ into stagedIn.
+   *
+   * This implementation only works on Unix-like platforms to open \p path_.
+   *
+   * Failure occurs if:
+   * - \p path_ cannot be opened
+   * - a certificate loaded is invalid
+   * - memory cannot be allocated for the certificate
+   *
+   * @param path_ the directory path to load certificates from.
    * @return non-zero on failure.
    */
-  int FileSystemStore::init(std::string &path)
+  int FileSystemStore::init(std::string &path_)
   {
-    return 0;
+    int error = 0;
+    ::dirent *entry;
+    ::DIR *dir = ::opendir(path.c_str());
+
+    //set member variable
+    path = path_;
+
+    if(dir == nullptr)
+    {
+      //couldn't open directory
+      error = -1;
+      goto fail;
+    }
+
+    //try to load every directory as a certificate
+    while((entry = readdir(dir)) != nullptr)
+    {
+      try
+      {
+        stagedIn.emplace_back(std::string(entry->d_name));
+        auto cert = stagedIn.back();
+
+        //verify cert is self-signed and valid
+        if(!(cert.is_self_signed() &&
+            cert.check_signature(*cert.subject_public_key())))
+        {
+          error = -2;
+          goto fail;
+        }
+      }
+      catch(Decoding_Error &e)
+      {
+        //do nothing - probably not a cert
+      }
+      catch(Stream_IO_Error &e)
+      {
+        //do nothing - probably not a cert
+      }
+      catch(std::bad_alloc &e)
+      {
+        error = -3;
+        goto fail;
+      }
+    }
+
+fail:
+    //close the directory ignoring errors
+    closedir(dir);
+    return error;
   }
 
   /**
@@ -38,7 +100,16 @@ namespace Bless
    */
   int FileSystemStore::isValid(Botan::X509_Certificate const &cert)
   {
-    return -1;
+    bool valid = false;
+
+    //check if any staged in certificate is valid
+    for(auto &c : stagedIn)
+    {
+      valid |= (cert == c);
+    }
+
+    //if the cert is valid, return 0
+    return valid ? 0 : -1;
   }
 
   /**

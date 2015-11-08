@@ -62,7 +62,7 @@ namespace Bless
       FileSystemStore() = default;
       ~FileSystemStore();
 
-      int init(std::string &path);
+      int init(std::string &path_);
       int isValid(Botan::X509_Certificate const &cert) override;
 
     private:
