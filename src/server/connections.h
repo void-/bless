@@ -17,7 +17,9 @@
 
 #include <thread>
 #include <mutex>
-#include <list>
+#include <condition_variable>
+#include <queue>
+#include <array>
 
 #include <botan/tls_server.h>
 #include <botan/tls_session_manager.h>
@@ -261,13 +263,21 @@ namespace Bless
   class SenderChannel : public Channel, public Runnable
   {
     public:
-      SenderChannel();
+      SenderChannel() = default;
       ~SenderChannel();
 
-      int init(int socket, sockaddr_in sender, ServerKey *server);
+      int init(ServerKey *serverKey_, MessageQueue *messageQueue_,
+        std::mutex *workLock_, std::condition_variable *workReady_,
+        std::queue<ChannelWork> *work_, Botan::RandomNumberGenerator *rng_);
 
     protected:
       void run() override;
+
+    private:
+      KeyStore *store;
+      std::mutex *workLock;
+      std::condition_variable *workReady;
+      std::queue<ChannelWork> *work;
   };
 
   /**

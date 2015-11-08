@@ -786,14 +786,26 @@ fail:
    * \p sender is a useful parameter because it could be used to detect
    * attempted DoS attacks.
    *
-   * @param sock opened socket for a tcp connection to a Sender.
-   * @param sender socket information about \p sock.
-   * @param server contains certificate of the Server, SenderChannel does not
+   * @param serverKey_ contains certificate of the Server, SenderChannel does not
    *   own this.
+   * @param messageQueue_ queue to write Receiver-bound messages to from
+   *   Senders.
+   * @param workLock_ lock to \p work_.
+   * @param workReady_ condition variable to \p work_.
+   * @param work_ queue to process new Sender connections from.
    * @return non-zero on failure.
    */
-  int SenderChannel::init(int sock, sockaddr_in sender, ServerKey *server)
+  int SenderChannel::init(ServerKey *serverKey_, MessageQueue *messageQueue_,
+      std::mutex *workLock_, std::condition_variable *workReady_,
+      std::queue<ChannelWork> *work_, RandomNumberGenerator *rng_)
   {
+    serverKey = serverKey_;
+    messageQueue = messageQueue_;
+    workLock = workLock_;
+    workReady = workReady_;
+    work = work_;
+    rng = rng_;
+
     return 0;
   }
 
@@ -838,6 +850,16 @@ fail:
     }
 
     store = store_;
+
+    //initialize all channel threads
+    for(auto &c : channels)
+    {
+      if(c.init(serverKey, queue, &workLock, &workReady, &connections, rng))
+      {
+        error = -6;
+        goto fail;
+      }
+    }
 
     //allocate a tcp socket
     if((listen = ::socket(PF_INET, SOCK_STREAM, 0)) == -1)
