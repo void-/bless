@@ -189,6 +189,20 @@ namespace Bless
    * @class ReceiverMain
    * @brief main class for handling a changing connection to the Receiver.
    *
+   * @var unsigned short ReceiverMain::port
+   * @brief udp port to listen for connections from the Receiver.
+   *
+   * @var ConnectionKey *ReceiverMain::receiverKey;
+   * @brief contains the public key of the Receiver.
+   *
+   * @var bool ReceiverMain::channelRunning;
+   * @brief indicates whether chan is running.
+   *
+   * @var ReceiverChannel ReceiverMain::chan;
+   * @brief the message channel to the Receiver as its own thread.
+   *
+   * @var Botan::RandomNumberGenerator *ReceiverMain::rng;
+   * @brief random number generator needed by chan.
    */
   class ReceiverMain : public MainConnection, public Runnable
   {
@@ -200,7 +214,6 @@ namespace Bless
         ConnectionKey *receiverKey_, Botan::RandomNumberGenerator *rng_);
       void run() override;
 
-      static const int timeout = 2000;
       static const unsigned short port = 9549;
 
     private:
@@ -247,6 +260,9 @@ namespace Bless
    * This should run on its own thread and will create many threads to handle
    * individual connections.
    *
+   * @var unsigned short SenderMain::port
+   * @brief tcp port used to listen for connections from Senders.
+   *
    * @var std::list<SenderChannel> SenderMain::channels
    * @brief list of all active connections to Senders.
    */
@@ -257,6 +273,8 @@ namespace Bless
       ~SenderMain();
       int init(MessageQueue *queue_, ServerKey *serverKey_,
         KeyStore *store);
+
+      static const unsigned short port = 9548;
 
     protected:
       void run() override;
