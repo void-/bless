@@ -238,6 +238,11 @@ namespace Bless
    */
   struct ChannelWork
   {
+    ChannelWork(int &conn_, sockaddr_in &sender_) :
+        conn(conn_), sender(sender_)
+    {
+    }
+
     int conn;
     sockaddr_in sender;
   };

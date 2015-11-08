@@ -906,8 +906,47 @@ fail:
 
   /**
    * @brief perform the main logic of receiving connections from Senders.
+   *
+   * Procedure:
+   * <p>
+   * - start all channel threads to handle connections
+   * - accept for tcp connections
+   * - load the new socket and Sender address to a work queue
+   * </p>
    */
   void SenderMain::run()
   {
+    int conn;
+    sockaddr_in addr;
+    socklen_t len;
+    std::unique_lock<std::mutex> lock;
+
+    //start all channel threads
+    for(auto &c : channels)
+    {
+      c.start();
+    }
+
+    while(true)
+    {
+      //reset length of address; the length written by accept() is ignored
+      len = sizeof(addr);
+
+      //wait for a Sender connection
+      if((conn =
+          ::accept(listen, reinterpret_cast<sockaddr *>(&addr), &len))
+          == -1)
+      {
+        //accept failed; try again?
+        continue;
+      }
+
+      //add the new connection to the work queue
+      lock = std::unique_lock<std::mutex>(workLock);
+      connections.emplace(conn, addr);
+      //signal a channel there's a new connection
+      workReady.notify_one();
+      lock.unlock();
+    }
   }
 }
