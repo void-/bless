@@ -147,7 +147,7 @@ namespace Bless
        * \p certChain should contain the Receiver's public key.
        *
        * If the certificate matches, it must be valid because it was verified
-       * @todo where is this cert verified.
+       * These are verified in authKeys when loaded.
        *
        * @param type the type of operation occuring.
        * @param certChain the certificate chain to verify.
@@ -311,8 +311,8 @@ namespace Bless
        * \p certChain should contain a Sender's public key; check this is valid
        * by searching for it in the KeyStore.
        *
-       * If the certificate matches, it must be valid because it was verified
-       * @todo where is this cert verified.
+       * If the certificate matches, it must be valid because it was verified.
+       * These are verified in authKeys when loaded.
        *
        * @param type the type of operation occuring.
        * @param certChain the certificate chain to verify.
