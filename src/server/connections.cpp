@@ -213,7 +213,7 @@ namespace Bless
           throw std::runtime_error("Must use for tls-server.");
         }
 
-        //if the cert is the Receiver's, return the private key
+        //if the cert is the Server's, return the private key
         if(cert == *serverKey->getCert())
         {
           return serverKey->getPrivKey();
@@ -237,6 +237,170 @@ namespace Bless
     private:
       ServerKey *serverKey;
       ConnectionKey *receiverKey;
+  };
+
+  /**
+   * @class SenderChannelPolicy
+   * @brief specifies the connection policy when Senders connect.
+   *
+   * The functions here should be overriden to restrict available cipher
+   * suites.
+   */
+  class SenderChannelPolicy : public TLS::Strict_Policy
+  {
+  };
+
+  /**
+   * @class SenderChannelCredentials
+   * @brief Manage the credentials for connections from Senders.
+   */
+  class SenderChannelCredentials : public Credentials_Manager
+  {
+    public:
+      /**
+       * @brief construct a ChannelCredentials.
+       *
+       * @warning this isn't valid until init() is called.
+       */
+      SenderChannelCredentials()
+      {
+      }
+
+      /**
+       * @brief destruct the ChannelCredentials.
+       *
+       * Don't deallocate authKeys.
+       */
+      ~SenderChannelCredentials() override
+      {
+      }
+
+      /**
+       * @brief initialize credentials to a Sender.
+       *
+       * @param serverKey_ the Server's certificate and private key.
+       * @param store_ KeyStore to lookup Sender certificates.
+       *
+       * @return non-zero on failure.
+       */
+      int init(ServerKey *serverKey_, KeyStore *store_)
+      {
+        serverKey = serverKey_;
+        store = store_;
+
+        return 0;
+      }
+
+      /**
+       * @brief return no trusted certificate authorities.
+       *
+       * Self-signed certificates are used between the Server and Sender; no
+       * certificate authorities are trusted.
+       *
+       * @return an empty vector
+       */
+      std::vector<Certificate_Store *> trusted_certificate_authorities(
+          const std::string &, const std::string &) override
+      {
+        return std::vector<Certificate_Store *>();
+      }
+
+      /**
+       * @brief verify the given certificate chain.
+       *
+       * \p certChain should contain a Sender's public key; check this is valid
+       * by searching for it in the KeyStore.
+       *
+       * If the certificate matches, it must be valid because it was verified
+       * @todo where is this cert verified.
+       *
+       * @param type the type of operation occuring.
+       * @param certChain the certificate chain to verify.
+       * @throw std::invalid_argument if its wrong.
+       * @throw std::runtime_error if \p type is not "tls_client"
+       */
+      void verify_certificate_chain(const std::string &type,
+          const std::string &,
+          const std::vector<X509_Certificate> &certChain) override
+      {
+        if(type != "tls-server")
+        {
+          throw std::runtime_error("Must use for tls-server.");
+        }
+
+        //the chain should be size 1 and valid in the key store
+        if(!(certChain.size() == 1 && (store->isValid(certChain[0]) == 0)))
+        {
+          throw std::invalid_argument("Certificate did not match Receiver's.");
+        }
+      }
+
+      /**
+       * @brief return a certificate chain to identify the Server.
+       *
+       * This returns the Server's self-signed cert, regardless of the type
+       * of key requested.
+       *
+       * This must be communicated, to the Receiver by means of some externel
+       * PKI.
+       *
+       * @param type the type of operation occuring
+       * @throw std::runtime_error if \p type is not "tls_client"
+       * @return vector containing the self-signed certificate for the Server.
+       */
+      std::vector<X509_Certificate> cert_chain(const std::vector<std::string>
+          &, const std::string &type, const std::string &) override
+      {
+        if(type != "tls-server")
+        {
+          throw std::runtime_error("Must use for tls-server.");
+        }
+        auto cert = serverKey->getCert();
+        return std::vector<X509_Certificate>{*cert};
+      }
+
+      /**
+       * @brief return the private key corresponding to the given \p cert.
+       *
+       * \p cert should have been returned by cert_chain().
+       *
+       * @param cert the certificate to yield the private key for.
+       * @param type the type of operation occuring.
+       * @throw std::runtime_error if \p type is not "tls_client"
+       * @return the private half of \p cert.
+       */
+      Private_Key *private_key_for(const X509_Certificate &cert,
+          const std::string &type, const std::string &) override
+      {
+        if(type != "tls-server")
+        {
+          throw std::runtime_error("Must use for tls-server.");
+        }
+
+        //if the cert is the Server's, return the private key
+        if(cert == *serverKey->getCert())
+        {
+          return serverKey->getPrivKey();
+        }
+
+        return nullptr;
+      }
+
+      /**
+       * @brief return whether an SRP connection should be attempted.
+       *
+       * Never try SRP, use long-standing public keys.
+       *
+       * @return false.
+       */
+      bool attempt_srp(const std::string &, const std::string &) override
+      {
+        return false;
+      }
+
+    private:
+      ServerKey *serverKey;
+      KeyStore *store;
   };
 
   /**
@@ -783,34 +947,70 @@ fail:
   /**
    * @brief initialize a SenderChannel with an opened socket.
    *
-   * \p sender is a useful parameter because it could be used to detect
-   * attempted DoS attacks.
+   * Initialize tls session and credentials managers.
    *
-   * @param serverKey_ contains certificate of the Server, SenderChannel does not
-   *   own this.
+   * @param serverKey_ contains certificate of the Server, SenderChannel does
+   *   not own this.
    * @param messageQueue_ queue to write Receiver-bound messages to from
    *   Senders.
+   * @param store_ KeyStore to validate Sender certificates.
    * @param workLock_ lock to \p work_.
    * @param workReady_ condition variable to \p work_.
    * @param work_ queue to process new Sender connections from.
    * @return non-zero on failure.
    */
   int SenderChannel::init(ServerKey *serverKey_, MessageQueue *messageQueue_,
-      std::mutex *workLock_, std::condition_variable *workReady_,
-      std::queue<ChannelWork> *work_, RandomNumberGenerator *rng_)
+      KeyStore *store_, std::mutex *workLock_,
+      std::condition_variable *workReady_, std::queue<ChannelWork> *work_,
+      RandomNumberGenerator *rng_)
   {
+    int error = 0;
+
+    //set member variables
     serverKey = serverKey_;
     messageQueue = messageQueue_;
+    store = store_;
     workLock = workLock_;
     workReady = workReady_;
     work = work_;
     rng = rng_;
 
-    return 0;
+    //allocate tls server objects
+    try
+    {
+      policy = new SenderChannelPolicy();
+      sessionManager = new TLS::Session_Manager_Noop();
+      auto creds = new SenderChannelCredentials();
+
+      if(creds->init(serverKey_, store_))
+      {
+        error = -1;
+        goto fail;
+      }
+      credentialsManager = creds;
+    }
+    catch(std::bad_alloc &e)
+    {
+      //couldn't dynamically allocate memory
+      error = -2;
+      goto fail;
+    }
+
+fail:
+    return error;
   }
 
   /**
    * @brief perform the main logic of connecting to a Sender.
+   *
+   * Procedure:
+   * <p>
+   * - wait until a connection is available on the work queue
+   * - allocate a new TLS server to handle the connection
+   * - read for a message from the Sender
+   * - write the message to the message queue
+   * - shutdown the connection
+   * </p>
    */
   void SenderChannel::run()
   {
@@ -854,7 +1054,8 @@ fail:
     //initialize all channel threads
     for(auto &c : channels)
     {
-      if(c.init(serverKey, queue, &workLock, &workReady, &connections, rng))
+      if(c.init(serverKey, queue, store, &workLock, &workReady, &connections,
+          rng))
       {
         error = -6;
         goto fail;

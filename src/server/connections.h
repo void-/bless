@@ -272,8 +272,9 @@ namespace Bless
       ~SenderChannel();
 
       int init(ServerKey *serverKey_, MessageQueue *messageQueue_,
-        std::mutex *workLock_, std::condition_variable *workReady_,
-        std::queue<ChannelWork> *work_, Botan::RandomNumberGenerator *rng_);
+        KeyStore *store_, std::mutex *workLock_,
+        std::condition_variable *workReady_, std::queue<ChannelWork> *work_,
+        Botan::RandomNumberGenerator *rng_);
 
     protected:
       void run() override;
