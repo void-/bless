@@ -249,9 +249,12 @@ namespace Bless
 
   /**
    * @brief destruct a Channel and all its owned resources.
+   *
+   * Close connection socket, ignoring errors.
    */
   Channel::~Channel()
   {
+    close(connection);
   }
 
   /**
@@ -281,9 +284,11 @@ namespace Bless
    * @brief destruct a MainConnection and all its owned resources.
    *
    * @warning do not delete queue or serverKey, they are shared.
+   * Close listen socket, ignoring errors.
    */
   MainConnection::~MainConnection()
   {
+    close(listen);
   }
 
   /**
