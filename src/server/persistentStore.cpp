@@ -36,7 +36,7 @@ namespace Bless
   {
     int error = 0;
     ::dirent *entry;
-    ::DIR *dir = ::opendir(path.c_str());
+    ::DIR *dir = ::opendir(path_.c_str());
 
     //set member variable
     path = path_;
