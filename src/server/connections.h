@@ -262,8 +262,8 @@ namespace Bless
    * - call start() to handle the connection on a separate thread
    * - The SenderChannel will complete the connection and deallocate itself
    *
-   * @var sockaddr_in SenderChannel::senderAddress
-   * @brief address of the Sender in this connection
+   * @var size_t SenderChannel::bufferSize
+   * @brief size, in bytes, of the buffer to use for the TLS connection.
    */
   class SenderChannel : public Channel, public Runnable
   {
@@ -279,11 +279,23 @@ namespace Bless
     protected:
       void run() override;
 
+      void send(const Botan::byte *const payload, size_t len);
+
+      void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
+        size_t len);
+      void recvData(const Botan::byte *const payload, size_t len);
+      bool handshake(const Botan::TLS::Session &session);
+      std::string nextProtocol(std::vector<std::string> protocols);
+
+      static const size_t bufferSize = 4096;
+      static const size_t timeout = 4000;
+
     private:
       KeyStore *store;
       std::mutex *workLock;
       std::condition_variable *workReady;
       std::queue<ChannelWork> *work;
+      Message partialMessage;
   };
 
   /**

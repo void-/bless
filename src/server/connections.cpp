@@ -1014,7 +1014,253 @@ fail:
    */
   void SenderChannel::run()
   {
+    std::unique_lock<std::mutex> lock;
+    ::pollfd pollSocket;
+    int error = 0;
+    unsigned char readBuffer[bufferSize];
 
+    while(true)
+    {
+      lock = std::unique_lock<std::mutex>(*workLock);
+      //wait until work is available
+      while(work->size() == 0)
+      {
+        workReady->wait(lock);
+      }
+
+      //remove a work item = a connection to handle
+      ChannelWork sender = work->front();
+      work->pop();
+      lock.unlock();
+
+      //assign member variable for server lambdas
+      connection = sender.conn;
+
+      //process the connection
+      try
+      {
+        server = new Botan::TLS::Server(
+          [this](const byte *const data, size_t len) {
+            this->send(data, len);
+          },
+          [this](const byte *const data, size_t len) {
+            this->recvData(data, len);
+          },
+          [this](TLS::Alert alert, const byte *const payload, size_t len) {
+            this->alert(alert, payload, len);
+          },
+          [this](const TLS::Session &session) {
+            return this->handshake(session);
+          },
+          *sessionManager,
+          *credentialsManager,
+          *policy,
+          *rng,
+          [this](std::vector<std::string> proto) {
+            return this->nextProtocol(proto);
+          },
+          false,
+          bufferSize);
+      }
+      catch(std::bad_alloc &e)
+      {
+        error = -1;
+        goto shutdown;
+      }
+
+      //set up socket for polling
+      pollSocket.fd = connection;
+      pollSocket.events = POLLIN; //poll for reading
+
+      //start up the connection
+      while(!server->is_active())
+      {
+        //wait at most 4 seconds-the Sender could be fake
+        if(::poll(&pollSocket, 1u, timeout) != 1)
+        {
+          error = -2;
+          goto shutdown;
+        }
+
+        //error on socket
+        if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
+            (pollSocket.revents & POLLNVAL))
+        {
+          //could have received ICMP unreachable
+          error = -3;
+          goto shutdown;
+        }
+
+        //read bytes from the candidate Receiver
+        auto len = ::read(connection, readBuffer, sizeof(readBuffer));
+
+        if(len <= 0)
+        {
+          //poll() lied!
+          error = -4;
+          goto shutdown;
+        }
+
+        //give the data to the server
+        try
+        {
+          server->received_data(readBuffer, len);
+        }
+        catch(std::runtime_error &e)
+        {
+          error = -5;
+          goto shutdown;
+        }
+      }
+
+      //secure connection established; read data from the Sender
+      while(server->is_active())
+      {
+        if(::poll(&pollSocket, 1u, timeout) != 1)
+        {
+          error = -6;
+          goto shutdown;
+        }
+
+        //error on socket
+        if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
+            (pollSocket.revents & POLLNVAL))
+        {
+          //could have received ICMP unreachable
+          error = -7;
+          goto shutdown;
+        }
+
+        //read bytes from the candidate Receiver
+        auto len = ::read(connection, readBuffer, sizeof(readBuffer));
+
+        if(len <= 0)
+        {
+          //poll() lied!
+          error = -8;
+          goto shutdown;
+        }
+
+        //give the data to the server
+        try
+        {
+          server->received_data(readBuffer, len);
+        }
+        catch(std::runtime_error &e)
+        {
+          error = -9;
+          goto shutdown;
+        }
+      }
+
+shutdown:
+      //successfully received a message from Sender or failure
+      if(server)
+      {
+        delete server;
+      }
+
+      close(connection);
+
+      //do something with error
+    }
+  }
+
+  /**
+   * @brief send write \p len bytes of \p payload to tcp socket.
+   *
+   * @param payload data to write.
+   * @param len length, in bytes, of \p payload.
+   */
+  void SenderChannel::send(const byte *const payload, size_t len)
+  {
+    size_t read = 0;
+    //keep writing the entire payload
+    while(read < len)
+    {
+      auto sent = ::send(connection, &payload[read], len, MSG_NOSIGNAL);
+
+      if(sent == -1)
+      {
+        throw std::runtime_error("send failed");
+      }
+
+      read += sent;
+    }
+  }
+
+  /**
+   * @brief called when a TLS alert is received
+   *
+   * @todo do something with the alert
+   *
+   * Beware that alert() might be called during init() for a different
+   * connection.
+   *
+   * @param alert
+   * @param payload
+   * @param len
+   */
+  void SenderChannel::alert(TLS::Alert alert, const byte *const payload,
+      size_t len)
+  {
+  }
+
+  /**
+   * @brief called when data is received from Sender.
+   *
+   * This function is non-reentrant; it should be called synchronously.
+   *
+   * Deserialize \p payload into partialMessage until partialMessage is
+   * complete. At this point, shutdown the TLS connection; no more bytes are
+   * needed from the Sender.
+   *
+   * @param payload some bytes of a Message from Sender.
+   * @param len length of \p payload in bytes.
+   */
+  void SenderChannel::recvData(const byte *const payload, size_t len)
+  {
+    //give payload bytes to message
+    int status = partialMessage.deserialize(payload, len);
+
+    //message was fully deserialized
+    if(status == 0)
+    {
+      //add to message queue
+      messageQueue->addMessage(partialMessage);
+
+      //signal to shutdown the TLS server
+      server->close();
+    }
+    else if(status == -1)
+    {
+      //error in deserialization
+      server->close();
+    }
+  }
+
+  /**
+   * @brief called when a handshake is created from Receiver to Server.
+   *
+   * @param session not used.
+   * @return false, don't cache the session
+   */
+  bool SenderChannel::handshake(const TLS::Session &)
+  {
+    return false;
+  }
+
+  /**
+   * @brief called to pick a protocol between Sender and Server; this feature
+   * is not used.
+   *
+   * @param protocols
+   *
+   * @return an empty string indicating no protocol.
+   */
+  std::string SenderChannel::nextProtocol(std::vector<std::string> protocols)
+  {
+    return "";
   }
 
   /**
