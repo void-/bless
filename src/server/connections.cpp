@@ -774,7 +774,7 @@ fail:
   {
     std::unique_lock<std::mutex> lock(serverLock);
     //TEST
-    server->send("Hello, World!");
+    server->send(m.data.data(), static_cast<size_t>(m.data.size()));
     lock.unlock();
   }
 
