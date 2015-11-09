@@ -19,6 +19,13 @@ namespace Bless
    */
   int Message::deserialize(unsigned char const *const data, std::size_t len)
   {
-    return 0;
+    //copy given payload into message
+    for(std::size_t i = 0; (i < len) && ((filled) < this->data.size()); ++i)
+    {
+      this->data[filled] = data[i];
+      ++filled;
+    }
+
+    return filled < this->data.size();
   }
 }

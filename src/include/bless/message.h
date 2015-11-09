@@ -2,6 +2,7 @@
 #define MESSAGE_H
 
 #include <cstdint> //for size_t
+#include <array>
 
 namespace Bless
 {
@@ -18,6 +19,8 @@ namespace Bless
       Message();
 
       int deserialize(unsigned char const *const data, std::size_t len);
+
+      std::array<unsigned char, 16> data;
 
     protected:
       std::size_t filled;
