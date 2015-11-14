@@ -415,10 +415,31 @@ namespace Bless
    * @brief destruct a Channel and all its owned resources.
    *
    * Close connection socket, ignoring errors.
+   * Destruct all allocated connection objects.
    */
   Channel::~Channel()
   {
     close(connection);
+
+    if(server)
+    {
+      delete server;
+    }
+
+    if(sessionManager)
+    {
+      delete sessionManager;
+    }
+
+    if(credentialsManager)
+    {
+      delete credentialsManager;
+    }
+
+    if(policy)
+    {
+      delete policy;
+    }
   }
 
   /**
@@ -467,7 +488,8 @@ namespace Bless
    * @param rng_ random number generator needed for d/tls connections.
    * @return non-zero on failure.
    */
-  int MainConnection::init(MessageQueue *queue_, ServerKey *serverKey_, RandomNumberGenerator *rng_)
+  int MainConnection::init(MessageQueue *queue_, ServerKey *serverKey_,
+      RandomNumberGenerator *rng_)
   {
     queue = queue_;
     serverKey = serverKey_;
@@ -1040,10 +1062,9 @@ fail:
       //remove a work item = a connection to handle
       ChannelWork sender = work->front();
       work->pop();
-      lock.unlock();
-
-      //assign member variable for server lambdas
+      //assign member variable for server lambdas; inside lock for destructor
       connection = sender.conn;
+      lock.unlock();
 
       //process the connection
       try
@@ -1299,6 +1320,16 @@ shutdown:
    */
   SenderMain::~SenderMain()
   {
+    std::unique_lock<std::mutex> lock(workLock);
+
+    //lock and close all outstanding connections
+    while(connections.size())
+    {
+      auto w = connections.front();
+      connections.pop();
+      ::close(w.conn);
+    }
+    lock.unlock();
   }
 
   /**
