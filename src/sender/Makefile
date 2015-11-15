@@ -11,7 +11,8 @@ all: main
 auth.o: auth.cpp auth.h
 connections.o: connections.cpp connections.h
 main: auth.o connections.o
-	$(CXX) $(CPPFLAGS) main.cpp auth.o connections.o $(LDFLAGS) -o $(BIN)
+	$(CXX) $(CPPFLAGS) main.cpp auth.o connections.o ../common/message.o \
+	$(LDFLAGS) -o $(BIN)
 
 .PHONY: clean
 
