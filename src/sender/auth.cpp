@@ -47,9 +47,9 @@ namespace Bless
       delete receiverCert;
     }
 
-    if(senderReceiverkey)
+    if(senderReceiverKey)
     {
-      delete senderReceiverkey;
+      delete senderReceiverKey;
     }
 
     if(senderServerKey)
@@ -182,7 +182,7 @@ namespace Bless
     //deserialize Sender's private key
     try
     {
-      senderReceiver = PKCS8::load_key(senderReceiver_, rng);
+      senderReceiverKey = PKCS8::load_key(senderReceiverKey_, rng);
     }
     catch(Stream_IO_Error &e)
     {
