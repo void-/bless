@@ -200,12 +200,20 @@ int main(int argc, char **argv)
 
   //get a message from the user
   std::cin >> message;
-  ::memcpy(m.data.data(), message.data(), m.data.size());
+  ::memcpy(m.data.data(), message.data(),
+    std::min(message.size(), m.data.size()));
 
-  //establish the message channel: connect to the Server
+  //connect to the Server
   if((error = chan.connect()))
   {
     std::cerr << "Failed to connect" << std::endl;
+    goto fail;
+  }
+
+  //send a message to Server
+  if((error = chan.sendMessage(m)))
+  {
+    std::cerr << "Failed to send message" << std::endl;
     goto fail;
   }
 
