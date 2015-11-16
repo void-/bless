@@ -200,8 +200,7 @@ int main(int argc, char **argv)
 
   //get a message from the user
   std::cin >> message;
-  ::memcpy(m.data.data(), message.data(),
-    std::min(message.size(), m.data.size()));
+  m = Message(message);
 
   //connect to the Server
   if((error = chan.connect()))
