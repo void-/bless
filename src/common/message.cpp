@@ -17,6 +17,24 @@ namespace Bless
   }
 
   /**
+   * @brief construct an example message given a string
+   */
+  Message::Message(std::string const &data) : filled(0)
+  {
+    for(std::size_t i = 0; i < std::min(data.size(), this->data.size()); ++i)
+    {
+      this->data[i] = data[i];
+    }
+
+    //pad out the end
+    for(std::size_t i = std::min(data.size(), this->data.size());
+        i < this->data.size(); ++i)
+    {
+      this->data[i] = '\0';
+    }
+  }
+
+  /**
    * @brief deserialize a Message with a fragment of data in \p data.
    *
    * @warning This is not thread safe.

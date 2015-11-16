@@ -17,6 +17,7 @@ namespace Bless
   {
     public:
       Message();
+      Message(std::string const &data);
 
       int deserialize(unsigned char const *const data, std::size_t len);
 
