@@ -12,6 +12,7 @@
 
 #include <botan/x509cert.h>
 
+#include <memory>
 #include <condition_variable>
 #include <list>
 #include <queue>
@@ -125,7 +126,7 @@ namespace Bless
        * @param msg the message to write; addMessage() takes ownership.
        * @return non-zero on failure.
        */
-      virtual int addMessage(Message msg) = 0;
+      virtual int addMessage(std::unique_ptr<Message> &&msg) = 0;
 
       /**
        * @brief return the number of realtime messages available via next().
@@ -150,7 +151,7 @@ namespace Bless
        *
        * @return the next message in the queue, giving ownership to the caller.
        */
-      virtual Message next() = 0;
+      virtual std::unique_ptr<Message> next() = 0;
 
       std::mutex realTimeLock;
       std::condition_variable messageReady;
@@ -165,12 +166,12 @@ namespace Bless
     public:
       ~InMemoryMessageQueue() override;
 
-      int addMessage(Message msg) override;
+      int addMessage(std::unique_ptr<Message> &&msg) override;
       size_t realTimeSize() const noexcept override;
-      Message next() override;
+      std::unique_ptr<Message> next() override;
 
     private:
-      std::queue<Message> realTimeMessages;
+      std::queue<Message *> realTimeMessages;
   };
 }
 

@@ -136,9 +136,9 @@ fail:
    * @param msg the message to enqueue and take ownership of.
    * @return non-zero on failure.
    */
-  int InMemoryMessageQueue::addMessage(Message msg)
+  int InMemoryMessageQueue::addMessage(std::unique_ptr<Message> &&msg)
   {
-    realTimeMessages.emplace(msg);
+    realTimeMessages.emplace(msg.release());
     MessageQueue::messageReady.notify_one();
 
     return 0;
@@ -163,15 +163,15 @@ fail:
    * @return the next message or a dummy message, giving ownership to the
    *   caller.
    */
-  Message InMemoryMessageQueue::next()
+  std::unique_ptr<Message> InMemoryMessageQueue::next()
   {
     //no realtime messages left, return a dummy
     if(!realTimeSize())
     {
-      return Message();
+      return std::unique_ptr<Message>(new Message());
     }
-    Message ret = realTimeMessages.front();
+    auto ret = realTimeMessages.front();
     realTimeMessages.pop();
-    return std::move(ret);
+    return std::unique_ptr<Message>(ret);
   }
 }
