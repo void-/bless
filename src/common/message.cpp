@@ -2,8 +2,18 @@
 
 namespace Bless
 {
+  /**
+   * @brief construct a default message.
+   */
   Message::Message() : filled(0)
   {
+    data[0] = 'H';
+    data[1] = 'i';
+    data[2] = '!';
+    for(std::size_t i = 3; i < data.size(); ++i)
+    {
+      data[i] = '\0';
+    }
   }
 
   /**
