@@ -20,6 +20,7 @@
 #include <condition_variable>
 #include <queue>
 #include <array>
+#include <memory>
 
 #include <botan/tls_server.h>
 #include <botan/tls_session_manager.h>
@@ -268,7 +269,7 @@ namespace Bless
   class SenderChannel : public Channel, public Runnable
   {
     public:
-      SenderChannel() = default;
+      SenderChannel();
       ~SenderChannel();
 
       int init(ServerKey *serverKey_, MessageQueue *messageQueue_,
@@ -295,7 +296,7 @@ namespace Bless
       std::mutex *workLock;
       std::condition_variable *workReady;
       std::queue<ChannelWork> *work;
-      Message partialMessage;
+      std::unique_ptr<Message> partialMessage;
   };
 
   /**

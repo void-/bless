@@ -797,7 +797,7 @@ fail:
   {
     std::unique_lock<std::mutex> lock(messageQueue->realTimeLock);
     std::chrono::milliseconds timeout(ReceiverChannel::timeout);
-    Message toSend;
+    std::unique_ptr<Message> toSend;
 
     //enter the loop locked
     while(true)
@@ -811,7 +811,7 @@ fail:
       //get the next message from the queue
       toSend = messageQueue->next();
       lock.unlock();
-      sendMessage(toSend);
+      sendMessage(*toSend);
 
       //lock down here because the loop is entered locked already
       lock.lock();
@@ -935,6 +935,15 @@ fail:
 fail:
     //XXX: do something with the error
     return;
+  }
+
+  /**
+   * @brief construct a SenderChannel.
+   *
+   * Call init() to make it valid.
+   */
+  SenderChannel::SenderChannel() : Channel(), partialMessage(nullptr)
+  {
   }
 
   /**
@@ -1068,6 +1077,17 @@ fail:
         goto shutdown;
       }
 
+      //allocate a message to write to
+      try
+      {
+        partialMessage = std::unique_ptr<Message>(new Message());
+      }
+      catch(std::bad_alloc &e)
+      {
+        error = -10;
+        goto shutdown;
+      }
+
       //set up socket for polling
       pollSocket.fd = connection;
       pollSocket.events = POLLIN; //poll for reading
@@ -1160,6 +1180,12 @@ shutdown:
         delete server;
       }
 
+      //deallocate the message
+      if(partialMessage)
+      {
+        partialMessage.reset();
+      }
+
       close(connection);
 
       //do something with error
@@ -1215,19 +1241,24 @@ shutdown:
    * complete. At this point, shutdown the TLS connection; no more bytes are
    * needed from the Sender.
    *
+   * Ownership of partialMessage is transfered to the message queue when
+   * completed.
+   *
+   * @invariant partialMessage always has a valid pointer.
+   *
    * @param payload some bytes of a Message from Sender.
    * @param len length of \p payload in bytes.
    */
   void SenderChannel::recvData(const byte *const payload, size_t len)
   {
     //give payload bytes to message
-    int status = partialMessage.deserialize(payload, len);
+    int status = partialMessage->deserialize(payload, len);
 
     //message was fully deserialized
     if(status == 0)
     {
-      //add to message queue
-      messageQueue->addMessage(partialMessage);
+      //give ownership to message queue
+      messageQueue->addMessage(std::move(partialMessage));
 
       //signal to shutdown the TLS server
       server->close();
