@@ -10,7 +10,7 @@ all: main
 
 auth.o: auth.cpp auth.h
 connections.o: connections.cpp connections.h
-main: auth.o connections.o
+main: auth.o connections.o ../common/message.o
 	$(CXX) $(CPPFLAGS) main.cpp auth.o connections.o ../common/message.o \
 	$(LDFLAGS) -o $(BIN)
 
