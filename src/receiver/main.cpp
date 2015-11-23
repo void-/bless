@@ -199,11 +199,11 @@ fail:
  */
 int getMessage(unsigned char const *const payload, std::size_t len)
 {
-    for(std::size_t i = 0; i < len; ++i)
-    {
-      std::cout << payload[i];
-    }
-    std::cout.flush();
+  for(std::size_t i = 0; i < len; ++i)
+  {
+    std::cout << payload[i];
+  }
+  std::cout.flush();
 
-    return 0;
+  return 0;
 }
