@@ -7,6 +7,7 @@
 #define CONNECTIONS_H
 
 #include "auth.h"
+#include <bless/message.h>
 
 #include <functional>
 #include <botan/tls_client.h>
@@ -68,7 +69,8 @@ namespace Bless
    * @brief information about the Server, of which there is none
    *
    * @var size_t Channel::bufferSize
-   * @brief the size, in bytes, used for stack-allocated buffers
+   * @brief the size, in bytes, used for stack-allocated buffers. Ensure this
+   * is larger than Message::data.size() by at least 24 bytes.
    *
    * @var int Channel::handshakeTimeout
    * @brief the number of milliseconds to timeout at when handshaking the DTLS
@@ -115,7 +117,9 @@ namespace Bless
         size_t len);
       bool handshake(const Botan::TLS::Session &session);
 
-      static const size_t bufferSize = 4096;
+      static const size_t bufferSize = 16416;
+      static_assert(bufferSize > (Message::size + 24u),
+        "Buffer too small for Message size.");
       static const int handshakeTimeout = 1 * 1000;
       static const int channelTimeout = 120 * 1000;
 
