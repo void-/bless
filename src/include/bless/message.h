@@ -3,6 +3,7 @@
 
 #include <cstdint> //for size_t
 #include <array>
+#include <istream>
 
 namespace Bless
 {
@@ -18,10 +19,12 @@ namespace Bless
     public:
       Message();
       Message(std::string const &data);
+      Message(std::istream &in);
 
       int deserialize(unsigned char const *const data, std::size_t len);
 
-      std::array<unsigned char, 16> data;
+      static const std::size_t size = 16384;
+      std::array<unsigned char, size> data;
 
     protected:
       std::size_t filled;

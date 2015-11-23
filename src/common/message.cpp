@@ -7,19 +7,13 @@ namespace Bless
    */
   Message::Message() : filled(0)
   {
-    data[0] = 'H';
-    data[1] = 'i';
-    data[2] = '!';
-    for(std::size_t i = 3; i < data.size(); ++i)
-    {
-      data[i] = '\0';
-    }
+    data.fill(0);
   }
 
   /**
    * @brief construct an example message given a string
    */
-  Message::Message(std::string const &data) : filled(0)
+  Message::Message(std::string const &data) : Message()
   {
     for(std::size_t i = 0; i < std::min(data.size(), this->data.size()); ++i)
     {
@@ -32,6 +26,14 @@ namespace Bless
     {
       this->data[i] = '\0';
     }
+  }
+
+  /**
+   * @brief construct a message given a stream to read from.
+   */
+  Message::Message(std::istream &in) : Message()
+  {
+    in.read((char *)(data.data()), data.size());
   }
 
   /**
