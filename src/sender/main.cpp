@@ -199,8 +199,7 @@ int main(int argc, char **argv)
   }
 
   //get a message from the user
-  std::cin >> message;
-  m = Message(message);
+  m = Message(std::cin);
 
   //connect to the Server
   if((error = chan.connect()))
