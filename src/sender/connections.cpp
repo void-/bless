@@ -3,6 +3,10 @@
 #include <unistd.h>
 #include <poll.h>
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0x0
+#endif
+
 using namespace Botan;
 
 namespace Bless

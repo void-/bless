@@ -6,6 +6,10 @@
 
 using namespace Botan;
 
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0x0
+#endif
+
 namespace Bless
 {
   /**
