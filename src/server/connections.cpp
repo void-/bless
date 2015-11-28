@@ -939,7 +939,8 @@ fail:
       if(chan.connect(receiverAddress))
       {
         //XXX: do something more sophisticated- the packet could be ignored
-        goto fail;
+        //goto fail;
+        continue;
       }
 
       //start the channel thread if its not already

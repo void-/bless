@@ -187,7 +187,7 @@ namespace Bless
       std::mutex serverLock;
 
       static const size_t bufferSize = 4096;
-      static const unsigned timeout = 30*1000;
+      static const unsigned timeout = 2*1000;
   };
 
   /**
