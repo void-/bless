@@ -23,7 +23,7 @@ namespace Bless
 
       int deserialize(unsigned char const *const data, std::size_t len);
 
-      static const std::size_t size = 16384;
+      static const std::size_t size = 512;
       std::array<unsigned char, size> data;
 
     protected:
