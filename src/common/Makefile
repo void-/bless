@@ -6,6 +6,7 @@ LDFLAGS =
 RM = rm -f
 
 message.o: message.cpp
+log.o: log.cpp
 
 .PHONY: clean
 
