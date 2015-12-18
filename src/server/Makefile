@@ -11,9 +11,10 @@ all: main
 authKeys.o: authKeys.cpp authKeys.h
 connections.o: connections.cpp connections.h
 persistentStore.o: persistentStore.cpp persistentStore.h
-main: authKeys.o connections.o persistentStore.o ../common/message.o
+main: authKeys.o connections.o persistentStore.o ../common/message.o \
+		../common/log.o
 	$(CXX) $(CPPFLAGS) main.cpp authKeys.o connections.o persistentStore.o \
-	../common/message.o $(LDFLAGS) -o $(BIN)
+	../common/message.o ../common/log.o $(LDFLAGS) -o $(BIN)
 
 .PHONY: clean
 
