@@ -3,6 +3,8 @@
  * @brief start the Server system.
  */
 
+#include <bless/log.h>
+
 #include "connections.h"
 #include "authKeys.h"
 #include "persistentStore.h"
@@ -27,6 +29,8 @@ std::string defaultServerReceiverKey = RESOURCE_PATH"server.pem";
 std::string defaultServerReceiverCert = RESOURCE_PATH"serverCert.pem";
 std::string defaultReceiverCert = RESOURCE_PATH"receiverCert.pem";
 std::string defaultSenderCert = RESOURCE_PATH;
+
+std::string logFile = RESOURCE_PATH"log";
 
 std::mutex exitLock;
 std::condition_variable mainExit;
@@ -59,6 +63,13 @@ int main(int argc, char **argv)
   ConnectionKey receiverKey;
   FileSystemStore store;
   std::unique_lock<std::mutex> waitLock;
+
+  //initialize the log
+  if((error = Log::init(logFile)))
+  {
+    std::cerr << "Failed to initialize log file: " << logFile << std::endl;
+    goto fail;
+  }
 
   //load Server keys
   if((error =
