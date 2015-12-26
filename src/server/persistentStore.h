@@ -85,9 +85,35 @@ namespace Bless
   class MessageStore
   {
     public:
-      virtual int append(Message msg) = 0;
 
-      virtual Message &next() = 0;
+      /**
+       * @brief add a new Message to the persistent store.
+       *
+       * @param msg Message to add. Ownership is still held by the caller.
+       * @return non-zero on failure.
+       */
+      virtual int append(Message &msg) = 0;
+
+      /**
+       * @brief yield the next Message from persistent store.
+       *
+       * The backend persistent store contains stored Messages. next() returns
+       * Messages until all from the persistent store have been returned. The
+       * intention is to resend Messages from before a crash.
+       *
+       * This transfers ownership to the caller.
+       * Use end() to determine if next() still has Messages left to yeild.
+       *
+       * @warning only one thread should be calling this at any time.
+       * @return the next Message, unspecified behaviour on failure.
+       */
+      virtual std::unique_ptr<Message> next() = 0;
+
+      /**
+       * @brief determine if any messages remain in the persistent store.
+       *
+       * @return true if calling next() won't return a valid Message.
+       */
       virtual bool end() = 0;
   };
 
