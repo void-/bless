@@ -11,6 +11,14 @@ namespace Bless
   }
 
   /**
+   * @brief destruct a Message, zeroing the data.
+   */
+  Message::~Message()
+  {
+    data.fill(0);
+  }
+
+  /**
    * @brief construct an example message given a string
    */
   Message::Message(std::string const &data) : Message()
@@ -34,6 +42,33 @@ namespace Bless
   Message::Message(std::istream &in) : Message()
   {
     in.read((char *)(data.data()), data.size());
+  }
+
+  /**
+   * @brief serialize a Message to a given buffer.
+   *
+   * The current implementation does a simple copy from the internal buffer,
+   * data, to \p out.
+   *
+   * @param out the buffer to write out to.
+   * @param len maximum length, in bytes, of \p out.
+   * @return non-zero on failure.
+   */
+  int Message::serialize(unsigned char *const out, std::size_t len) const
+  {
+    //check out is large enough
+    if(len < size)
+    {
+      return -1;
+    }
+
+    //copy data member variable to out
+    for(std::size_t i = 0; (i < len); ++i)
+    {
+      out[i] = data[i];
+    }
+
+    return 0;
   }
 
   /**
