@@ -277,6 +277,12 @@ fail:
    */
   InMemoryMessageQueue::~InMemoryMessageQueue()
   {
+    while(realTimeMessages.size())
+    {
+      auto i = realTimeMessages.front();
+      realTimeMessages.pop();
+      delete i;
+    }
   }
 
   /**
