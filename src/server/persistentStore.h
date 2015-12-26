@@ -16,6 +16,7 @@
 #include <condition_variable>
 #include <list>
 #include <queue>
+#include <fstream>
 
 namespace Bless
 {
@@ -172,6 +173,30 @@ namespace Bless
 
     private:
       std::queue<Message *> realTimeMessages;
+  };
+
+  /**
+   * @class FileMessageQueue
+   * @brief implementation of MessageQueue that stores messages to a file.
+   */
+  class FileMessageQueue : public MessageQueue
+  {
+    public:
+      ~FileMessageQueue() override;
+
+      int init(std::string const &file);
+      int init();
+
+      int addMessage(std::unique_ptr<Message> &&msg) override;
+      size_t realTimeSize() const noexcept override;
+      std::unique_ptr<Message> next() override;
+
+    protected:
+      static const std::string filePath;
+
+    private:
+      std::queue<Message *> realTimeMessages;
+      std::fstream backend;
   };
 }
 
