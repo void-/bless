@@ -135,11 +135,8 @@ namespace Bless
   class FileMessageStore : public MessageStore
   {
     public:
-<<<<<<< message_
       ~FileMessageStore();
 
-=======
->>>>>>> HEAD~43
       int init(std::string const &file);
       int init();
 
