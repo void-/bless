@@ -118,6 +118,37 @@ namespace Bless
   };
 
   /**
+   * @class FileMessageStore
+   * @brief implementation of MessageStore backed by a single file.
+   *
+   * @var std::fstream FileMessageStore::backend
+   * @brief underlying file to read and write to
+   *
+   * @var std::mutex FileMessageStore::backendLock
+   * @brief lock to synchronize using backend from append() and next()
+   *
+   * @var std::size_t FileMessageStore::offset
+   * @brief current seek position in backend used by next()
+   */
+  class FileMessageStore : public MessageStore
+  {
+    public:
+      int init(std::string const &file);
+      int init();
+
+      int append(Message &msg) override;
+      std::unique_ptr<Message> next() override;
+      bool end() override;
+
+    protected:
+      static const std::string defaultFilePath;
+
+      std::fstream backend;
+      std::mutex backendLock;
+      std::size_t offset;
+  };
+
+  /**
    * @class MessageQueue
    * @brief stores realtime and persistent Messages.
    *
@@ -217,12 +248,9 @@ namespace Bless
       size_t realTimeSize() const noexcept override;
       std::unique_ptr<Message> next() override;
 
-    protected:
-      static const std::string filePath;
-
     private:
       std::queue<Message *> realTimeMessages;
-      std::fstream backend;
+      FileMessageStore store;
   };
 }
 
