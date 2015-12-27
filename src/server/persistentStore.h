@@ -228,6 +228,8 @@ namespace Bless
     public:
       ~InMemoryMessageQueue() override;
 
+      int init();
+
       int addMessage(std::unique_ptr<Message> &&msg) override;
       size_t realTimeSize() const noexcept override;
       std::unique_ptr<Message> next() override;
