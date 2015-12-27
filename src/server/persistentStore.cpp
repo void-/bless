@@ -8,6 +8,13 @@ using namespace Botan;
 namespace Bless
 {
   /**
+   * @brief destruct a KeyStore.
+   */
+  KeyStore::~KeyStore()
+  {
+  }
+
+  /**
    * @brief destruct a FileSystemStore and all its owned resources.
    */
   FileSystemStore::~FileSystemStore()
@@ -113,6 +120,112 @@ fail:
   }
 
   /**
+   * @brief destruct a MessageStore.
+   */
+  MessageStore::~MessageStore()
+  {
+  }
+
+  const std::string FileMessageStore::defaultFilePath = "./messages";
+
+  /**
+   * @brief destruct a FileMessageStore and close the underlying file
+   */
+  FileMessageStore::~FileMessageStore()
+  {
+    backend.close(); //ignore any error
+  }
+
+  /**
+   * @brief initialize a message store given a path to a backing file.
+   *
+   * @param file path to a file to use
+   * @return non-zero on failure
+   */
+  int FileMessageStore::init(std::string const &file)
+  {
+    backend.open(file, std::ios_base::in | std::ios_base::app);
+
+    offset = 0;
+
+    return !backend;
+  }
+
+  /**
+   * @brief initialize a message queue using the default file.
+   *
+   * @return non-zero on failure.
+   */
+  int FileMessageStore::init()
+  {
+    return init(defaultFilePath);
+  }
+
+  /**
+   * @brief add and commit a message to the file.
+   * <p>
+   * - Course-grain lock the entire function
+   * - Serialize \p msg into a buffer
+   * - seek to the end of the underlying file
+   * - write out the buffer
+   * - flush to commit the data
+   * </p>
+   *
+   * @param msg borrowed message to write out to the file.
+   * @return non-zero on failure.
+   */
+  int FileMessageStore::append(Message &msg)
+  {
+    std::lock_guard<decltype(backendLock)> lock(backendLock);
+    unsigned char buf[Message::size];
+
+    if(msg.serialize(buf, sizeof(buf)))
+    {
+      return -1;
+    }
+
+    //seek, write, flush; saving the returned stream
+    backend.seekp(0, std::ios_base::end)
+      .write(reinterpret_cast<char *>(buf), Message::size)
+      .flush();
+
+    //return 1 if the stream errored
+    return !backend;
+  }
+
+  /**
+   * @brief yield the next Message from the file.
+   *
+   * @return a Message, transfering ownership to the caller.
+   */
+  std::unique_ptr<Message> FileMessageStore::next()
+  {
+
+  }
+
+  /**
+   * @brief determine if any Messages are left in the file for next().
+   *
+   * Example use:\n
+   * @code
+   * FileMessageStore store;
+   * ...
+   *
+   * while(!store.end())
+   * {
+   *   auto m = store.next();
+   *   //do something with Message m
+   * }
+   * @endcode
+   *
+   * @return true if no more Messages remain.
+   */
+  bool FileMessageStore::end()
+  {
+
+  }
+
+  /**
    * @brief destruct a MessageQueue and all its owned resources.
    */
   MessageQueue::~MessageQueue()
@@ -121,8 +234,6 @@ fail:
 
   /**
    * @brief destruct the MessageQueue.
-   *
-   * Nothing to do because nothing is dynamically allocated.
    */
   InMemoryMessageQueue::~InMemoryMessageQueue()
   {
