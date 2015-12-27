@@ -301,6 +301,8 @@ fail:
    *
    * This signals messageReady.
    *
+   * @bug this has a race condition; the lock is not acquired.
+   *
    * @param msg the message to enqueue and take ownership of.
    * @return non-zero on failure.
    */
@@ -415,5 +417,84 @@ fail:
   std::unique_ptr<Message> FileMessageQueue::next(unsigned timeout)
   {
     return MessageQueue::next(timeout);
+  }
+
+  /**
+   * @brief destruct the MessageQueue and all owned messages.
+   */
+  FileMessageQueue::~FileMessageQueue()
+  {
+    while(realTimeMessages.size())
+    {
+      auto i = realTimeMessages.front();
+      realTimeMessages.pop();
+      delete i;
+    }
+  }
+
+  /**
+   * @brief add \p msg to the realtime queue, taking ownership.
+   *
+   * Procedure:
+   * <p>
+   * - take ownership of \p msg
+   * - put it on the realtime queue
+   * - add the new message to the message store
+   * - signal messageReady
+   * </p>
+   *
+   * @param msg the message to enqueue and take ownership of.
+   * @return non-zero on failure.
+   */
+  int FileMessageQueue::addMessage(std::unique_ptr<Message> &&msg)
+  {
+    std::lock_guard<decltype(realTimeLock)> lock(realTimeLock);
+    realTimeMessages.emplace(msg.release());
+    Message &m = *realTimeMessages.back(); //get a reference to the new message
+
+    //store the message and signal
+    store.append(m);
+    MessageQueue::messageReady.notify_one();
+
+    return 0;
+  }
+
+  /**
+   * @brief return the number of realtime messages left.
+   *
+   * @return the number of messages in realTimeMessages.
+   */
+  size_t FileMessageQueue::realTimeSize() const noexcept
+  {
+    return realTimeMessages.size();
+  }
+
+  /**
+   * @brief return the next realtime message.
+   *
+   * If the underlying queue of messages is empty, a new, dummy message is
+   * returned by calling the Message constructor.
+   *
+   * @return the next message or a dummy message, giving ownership to the
+   *   caller.
+   */
+  std::unique_ptr<Message> FileMessageQueue::next()
+  {
+    //return a realtime message if available
+    if(realTimeSize())
+    {
+      auto ret = realTimeMessages.front();
+      realTimeMessages.pop();
+      return std::unique_ptr<Message>(ret);
+    }
+
+    //read an old message from the store if any are left
+    if(!store.end())
+    {
+      return store.next();
+    }
+
+    //no messages left at all; return a dummy
+    return std::unique_ptr<Message>(new Message());
   }
 }
