@@ -37,6 +37,7 @@ namespace Bless
   class KeyStore
   {
     public:
+      virtual ~KeyStore();
       virtual int isValid(Botan::X509_Certificate const &cert) = 0;
   };
 
@@ -85,6 +86,7 @@ namespace Bless
   class MessageStore
   {
     public:
+      virtual ~MessageStore();
 
       /**
        * @brief add a new Message to the persistent store.
@@ -133,6 +135,8 @@ namespace Bless
   class FileMessageStore : public MessageStore
   {
     public:
+      ~FileMessageStore();
+
       int init(std::string const &file);
       int init();
 
