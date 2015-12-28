@@ -241,16 +241,42 @@ fail:
   }
 
   /**
+   * @brief default interface implementation to get a message off the queue.
+   *
+   * Synchronously removes the front item from the queue, blocking for at most
+   * \p timeout milliseconds.
+   *
+   * @param timeout maximum number of milliseconds to block during next().
+   * @return the next message in the queue, giving ownership to the caller.
+   */
+  std::unique_ptr<Message> MessageQueue::next(unsigned timeout)
+  {
+    std::unique_lock<decltype(realTimeLock)> lock(realTimeLock);
+    std::chrono::milliseconds t(timeout);
+
+    //if queue is empty, wait
+    if(!realTimeSize())
+    {
+      messageReady.wait_for(lock, t);
+    }
+
+    //no messages before the timeout: return a dummy
+    if(!realTimeSize())
+    {
+      return std::unique_ptr<Message>(new Message());
+    }
+
+    //a message is available, remove it from the queue
+    auto ret = realTimeMessages.front();
+    realTimeMessages.pop();
+    return std::unique_ptr<Message>(ret);
+  }
+
+  /**
    * @brief destruct the MessageQueue.
    */
   InMemoryMessageQueue::~InMemoryMessageQueue()
   {
-    while(realTimeMessages.size())
-    {
-      auto i = realTimeMessages.front();
-      realTimeMessages.pop();
-      delete i;
-    }
   }
 
   /**
@@ -269,13 +295,12 @@ fail:
    *
    * This signals messageReady.
    *
-   * @bug this has a race condition; the lock is not acquired.
-   *
    * @param msg the message to enqueue and take ownership of.
    * @return non-zero on failure.
    */
   int InMemoryMessageQueue::addMessage(std::unique_ptr<Message> &&msg)
   {
+    std::lock_guard<decltype(realTimeLock)> lock(realTimeLock);
     realTimeMessages.emplace(msg.release());
     MessageQueue::messageReady.notify_one();
 
@@ -287,7 +312,7 @@ fail:
    *
    * @return the number of messages in realTimeMessages.
    */
-  size_t InMemoryMessageQueue::realTimeSize() const noexcept
+  size_t MessageQueue::realTimeSize() const noexcept
   {
     return realTimeMessages.size();
   }
@@ -295,22 +320,16 @@ fail:
   /**
    * @brief return the next realtime message.
    *
-   * If the underlying queue of messages is empty, a new, dummy message is
-   * returned by calling the Message constructor.
+   * This just calls the default MessageQueue implementation.
    *
+   * @param timeout maximum number of milliseconds to wait for a realtime
+   *   message.
    * @return the next message or a dummy message, giving ownership to the
    *   caller.
    */
-  std::unique_ptr<Message> InMemoryMessageQueue::next()
+  std::unique_ptr<Message> InMemoryMessageQueue::next(unsigned timeout)
   {
-    //no realtime messages left, return a dummy
-    if(!realTimeSize())
-    {
-      return std::unique_ptr<Message>(new Message());
-    }
-    auto ret = realTimeMessages.front();
-    realTimeMessages.pop();
-    return std::unique_ptr<Message>(ret);
+    return MessageQueue::next(timeout);
   }
 
   /**
@@ -378,41 +397,17 @@ fail:
   }
 
   /**
-   * @brief return the number of realtime messages left.
-   *
-   * @return the number of messages in realTimeMessages.
-   */
-  size_t FileMessageQueue::realTimeSize() const noexcept
-  {
-    return realTimeMessages.size();
-  }
-
-  /**
    * @brief return the next realtime message.
    *
-   * If the underlying queue of messages is empty, a new, dummy message is
-   * returned by calling the Message constructor.
+   * This just calls the default MessageQueue implementation.
    *
+   * @param timeout maximum number of milliseconds to wait for a realtime
+   *   message.
    * @return the next message or a dummy message, giving ownership to the
    *   caller.
    */
-  std::unique_ptr<Message> FileMessageQueue::next()
+  std::unique_ptr<Message> FileMessageQueue::next(unsigned timeout)
   {
-    //return a realtime message if available
-    if(realTimeSize())
-    {
-      auto ret = realTimeMessages.front();
-      realTimeMessages.pop();
-      return std::unique_ptr<Message>(ret);
-    }
-
-    //read an old message from the store if any are left
-    if(!store.end())
-    {
-      return store.next();
-    }
-
-    //no messages left at all; return a dummy
-    return std::unique_ptr<Message>(new Message());
+    return MessageQueue::next(timeout);
   }
 }
