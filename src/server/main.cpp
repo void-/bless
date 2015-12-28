@@ -12,6 +12,7 @@
 #include <botan/auto_rng.h>
 
 #include <iostream>
+#include <csignal>
 #include <condition_variable>
 
 /**
@@ -33,6 +34,7 @@ std::string defaultSenderCert = RESOURCE_PATH;
 std::string logFile = RESOURCE_PATH"log";
 
 std::mutex exitLock;
+bool blessDone = false;
 std::condition_variable mainExit;
 
 /**
@@ -139,11 +141,25 @@ int main(int argc, char **argv)
     goto fail;
   }
 
-  //wait until its time to exit
-  //waitLock = std::unique_lock<std::mutex>(exitLock);
-  //mainExit.wait(waitLock);
+  //register a signal handler to wakeup main to cleanly exit
+  std::signal(SIGINT, [] (int) {
+    std::lock_guard<std::mutex> lock(exitLock);
+    blessDone = true;
+    mainExit.notify_one();
+  });
 
-  recv.join();
+  //wait until its time to exit
+  waitLock = std::unique_lock<std::mutex>(exitLock);
+  while(!blessDone)
+  {
+    mainExit.wait(waitLock);
+  }
+
+  //workaround to terminate() blocking
+  _exit(-1);
+
+  sender.terminate();
+  recv.terminate();
 
 fail:
   return error;
