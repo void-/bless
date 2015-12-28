@@ -821,26 +821,13 @@ fail:
    */
   void ReceiverChannel::run()
   {
-    std::unique_lock<std::mutex> lock(messageQueue->realTimeLock);
-    std::chrono::milliseconds timeout(ReceiverChannel::timeout);
     std::unique_ptr<Message> toSend;
 
-    //enter the loop locked
     while(true)
     {
-      //wait until a real time message is available or timeout
-      if(messageQueue->realTimeSize() == 0)
-      {
-        messageQueue->messageReady.wait_for(lock, timeout);
-      }
-
-      //get the next message from the queue
-      toSend = messageQueue->next();
-      lock.unlock();
+      //get the next message, blocking in next()
+      toSend = messageQueue->next(ReceiverChannel::timeout);
       sendMessage(*toSend);
-
-      //lock down here because the loop is entered locked already
-      lock.lock();
     }
   }
 
