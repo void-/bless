@@ -541,6 +541,7 @@ namespace Bless
       RandomNumberGenerator *rng_)
   {
     int error = 0;
+    receiverAvailable = false;
 
     if((error = Channel::init(socket, serverKey_, messageQueue_, rng_)))
     {
@@ -644,7 +645,7 @@ fail:
     while(!tmpServer->is_active())
     {
       //wait at most 2 seconds-the Receiver could be fake
-      if(::poll(&pollSocket, 1u, timeout) != 1)
+      if(::poll(&pollSocket, 1u, connectTimeout) != 1)
       {
         error = -8;
         goto fail;
@@ -690,6 +691,8 @@ fail:
     //lock to safely update server
     lock = std::unique_lock<std::mutex>(serverLock);
     server = tmpServer;
+    receiverAvailable = true;
+    receiverCondition.notify_one();
     lock.unlock();
 
     //don't lock to delete
@@ -815,18 +818,53 @@ fail:
    * Procedure:
    * <p>
    * - sleep on the MessageQueue waiting at most timeout milliseconds
-   * - take a message off the queue and send it to the Receiver
+   * - take ownership of the next message on the queue
+   * - send the message to the Receiver with an exponential backoff
    * </p>
    */
   void ReceiverChannel::run()
   {
+    decltype(std::chrono::system_clock::now()) addressTimeout;
+    bool localReceiverAvailable = false;
+    std::chrono::milliseconds window(ReceiverChannel::locationTimeout);
+    std::chrono::milliseconds delay(100);
     std::unique_ptr<Message> toSend;
 
     while(true)
     {
+      //sleep if no Receiver is available
+      if(!localReceiverAvailable)
+      {
+        std::unique_lock<std::mutex> lock(serverLock);
+        //send failed or too much time passed, no receiver is available
+        receiverAvailable = false;
+
+        //sleep until connect() gets a new Receiver
+        while(!receiverAvailable)
+        {
+          receiverCondition.wait(lock);
+        }
+
+        //reset the timeout
+        addressTimeout = std::chrono::system_clock::now() + window;
+      }
+
       //get the next message, blocking in next()
-      toSend = messageQueue->next(ReceiverChannel::timeout);
-      sendMessage(*toSend);
+      toSend = messageQueue->next(holepunchTimeout);
+
+      //send the next message with exponential backoff
+      for(unsigned i = 0; i < iterations; ++i)
+      {
+        sendMessage(*toSend);
+        //wait .1, .2, .4, .8, 1.6 seconds
+        std::this_thread::sleep_for(delay * (1u<<i));
+      }
+
+      //no Receiver if too much time has passed or sending failed
+      localReceiverAvailable =
+        (std::chrono::system_clock::now() < addressTimeout) &
+        1; //replace with any(message error)
+      //update a local bool to avoid locking the shared `receiverAvailable'
     }
   }
 
@@ -861,7 +899,6 @@ fail:
       return -1;
     }
 
-    channelRunning = false;
     receiverKey = receiverKey_;
 
     //allocate a socket
@@ -911,6 +948,13 @@ fail:
     sockaddr_in receiverAddress;
     ::socklen_t addrLen;
 
+    //start the channel thread even with no connection
+    if(chan.start())
+    {
+      //couldn't start the channel thread
+      goto fail;
+    }
+
     while(true)
     {
       addrLen = sizeof(receiverAddress);
@@ -931,17 +975,6 @@ fail:
         //XXX: do something more sophisticated- the packet could be ignored
         //goto fail;
         continue;
-      }
-
-      //start the channel thread if its not already
-      if(!channelRunning)
-      {
-        if(chan.start())
-        {
-          //couldn't start the channel thread
-          goto fail;
-        }
-        channelRunning = true;
       }
     }
 

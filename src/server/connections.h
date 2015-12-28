@@ -158,8 +158,22 @@ namespace Bless
    * @var size_t ReceiverChannel::bufferSize
    * @brief size, in bytes, of the buffer to use for the DTLS connection.
    *
-   * @var unsigned RecieverChannel::timeout
-   * @brief length, in milliseconds, to wait between sending a message.
+   * @var unsigned RecieverChannel::holepunchTimeout
+   * @brief length, in milliseconds, to wait between sending a message. This
+   *   should be less than the NAT holepunch for the Receiver is expected to
+   *   stay open.
+   *
+   * @var unsigned RecieverChannel::connectTimeout
+   * @brief maximum time, in milliseconds, to wait between receiving messages
+   *   from a new Receiver trying to make a connection.
+   *
+   * @var unsigned ReceiverChannel::locationTimeout
+   * @brief maximum time, in milliseconds, to assume that a Receiver is at a
+   *   single address. i.e. close the connection after locationTimeout has
+   *   passed.
+   *
+   * @var unsigned RecieverChannel::iterations
+   * @brief number of times to send a single Message with exponential backoff.
    */
   class ReceiverChannel : public Channel, public Runnable
   {
@@ -184,10 +198,16 @@ namespace Bless
 
       void run() override;
       ConnectionKey *receiverKey;
+
       std::mutex serverLock;
+      bool receiverAvailable;
+      std::condition_variable receiverCondition;
 
       static const size_t bufferSize = 4096;
-      static const unsigned timeout = 2*1000;
+      static const unsigned holepunchTimeout = 30*1000;
+      static const unsigned connectTimeout = 2*1000;
+      static const unsigned locationTimeout = 4*60*60*1000;
+      static const unsigned iterations = 5;
   };
 
   /**
@@ -223,7 +243,6 @@ namespace Bless
 
     private:
       ConnectionKey *receiverKey;
-      bool channelRunning;
       ReceiverChannel chan;
   };
 
