@@ -154,16 +154,15 @@ namespace Bless
 
   /**
    * @class MessageQueue
-   * @brief stores realtime and persistent Messages.
+   * @brief interface to store Messages in memory and persistently.
    *
-   * MessageQueue will iterate over messages using next(). Messages are of two
-   * types:<p>
-   * - realtime (added with addMessage())
-   * - old (staged in from disk)
-   * </p>
+   * Store messages with addMessage() which can commit them to persistent
+   * storage, depending on the implementation.
    *
-   * next() will yield all real time messages until it runs out. It then yields
-   * all messages from disk and when those run out, finally a dummy message.
+   * next() will yields messages from addMessage(). If none are available, a
+   * dummy message is returned.
+   *
+   * Implementors should be thread safe.
    *
    * @var std::mutex MessageQueue::realTimeLock
    * @brief lock to messageReady.
@@ -178,12 +177,10 @@ namespace Bless
       virtual ~MessageQueue();
 
       /**
-       * @brief write a message to disk and take ownership.
+       * @brief synchronously write a message to the queue and take ownership.
        *
-       * When addMessage() returns, \p msg has been written to disk and \p msg
-       * will be available via next().
-       *
-       * realTimeLock will be acquired and messageReady will be signaled.
+       * When addMessage() returns, \p msg should be commited and available
+       * via next().
        *
        * @param msg the message to write; addMessage() takes ownership.
        * @return non-zero on failure.
@@ -191,32 +188,36 @@ namespace Bless
       virtual int addMessage(std::unique_ptr<Message> &&msg) = 0;
 
       /**
-       * @brief return the number of realtime messages available via next().
+       * @brief return the size of the underlying queue.
        *
        * This can be used to know how many times next() must be called to
        * exhaust all realtime messages.
        *
-       * This is the condition for messageReady.
-       *
-       * @return the size of the structure holding realtime messages.
+       * @return the message queue size.
        */
-      virtual size_t realTimeSize() const noexcept = 0;
+      size_t realTimeSize() const noexcept;
 
       /**
        * @brief return the next message from the message queue.
        *
-       * All realtime messages added via addMessage() will be returned before
-       * any old messages from disk. When all messages of both types are
-       * returned, a dummy message will be returned instead.
+       * This synchronously gets the next Message off the realtime queue. If no
+       * Message is available, next() will block until either condition is
+       * met:\n
+       * - addMessage() returns on another thread
+       * - \p timeout elapses, in which case, a dummy Message is returned
        *
-       * This gives ownership of the message to the caller.
+       * This gives ownership of the message to the caller via unique_ptr.
        *
+       * @param timeout maximum number of milliseconds to block during next().
        * @return the next message in the queue, giving ownership to the caller.
        */
-      virtual std::unique_ptr<Message> next() = 0;
+      virtual std::unique_ptr<Message> next(unsigned timeout) = 0;
 
+    protected:
       std::mutex realTimeLock;
       std::condition_variable messageReady;
+
+      std::queue<Message *> realTimeMessages;
   };
 
   /**
@@ -231,11 +232,7 @@ namespace Bless
       int init();
 
       int addMessage(std::unique_ptr<Message> &&msg) override;
-      size_t realTimeSize() const noexcept override;
-      std::unique_ptr<Message> next() override;
-
-    private:
-      std::queue<Message *> realTimeMessages;
+      std::unique_ptr<Message> next(unsigned timeout) override;
   };
 
   /**
@@ -251,11 +248,9 @@ namespace Bless
       int init();
 
       int addMessage(std::unique_ptr<Message> &&msg) override;
-      size_t realTimeSize() const noexcept override;
-      std::unique_ptr<Message> next() override;
+      std::unique_ptr<Message> next(unsigned timeout) override;
 
     private:
-      std::queue<Message *> realTimeMessages;
       FileMessageStore store;
   };
 }
