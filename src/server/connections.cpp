@@ -798,10 +798,9 @@ fail:
    */
   void ReceiverChannel::sendMessage(Message &m)
   {
-    std::unique_lock<std::mutex> lock(serverLock);
+    std::lock_guard<std::mutex> lock(serverLock);
     //TEST
     server->send(m.data.data(), static_cast<size_t>(m.data.size()));
-    lock.unlock();
   }
 
   /**
