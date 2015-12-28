@@ -14,32 +14,15 @@ namespace Bless
    *
    * @warning call init() to make this valid.
    */
-  AuthKeys::AuthKeys() : serverCert(nullptr), receiverCert(nullptr),
-      receiverPrivKey(nullptr)
+  AuthKeys::AuthKeys()
   {
   }
 
   /**
    * @brief destruct AuthKeys along with its internal keys.
-   *
-   * Only deallocate a key if its not null.
    */
   AuthKeys::~AuthKeys()
   {
-    if(serverCert)
-    {
-      delete serverCert;
-    }
-
-    if(receiverCert)
-    {
-      delete receiverCert;
-    }
-
-    if(receiverPrivKey)
-    {
-      delete receiverPrivKey;
-    }
   }
 
   /**
@@ -63,7 +46,8 @@ namespace Bless
     //deserialize the Server's cert
     try
     {
-      serverCert = new X509_Certificate(server);
+      serverCert =
+        std::unique_ptr<X509_Certificate const>(new X509_Certificate(server));
 
       //verify cert is self-signed and valid
       if(!(serverCert->is_self_signed() &&
@@ -88,7 +72,9 @@ namespace Bless
     //deserialize Receiver's cert
     try
     {
-      receiverCert = new X509_Certificate(recvCert);
+      receiverCert =
+        std::unique_ptr<X509_Certificate const>(
+            new X509_Certificate(recvCert));
 
       //verify cert is self-signed and valid
       if(!(receiverCert->is_self_signed() &&
@@ -113,7 +99,8 @@ namespace Bless
     //deserialize Receiver's private key
     try
     {
-      receiverPrivKey = PKCS8::load_key(recvKey, rng);
+      receiverPrivKey =
+        std::unique_ptr<Private_Key>(PKCS8::load_key(recvKey, rng));
     }
     catch(Stream_IO_Error &e)
     {
@@ -136,30 +123,30 @@ namespace Bless
   /**
    * @brief return a pointer to the Server's certificate.
    *
-   * @return serverCert.
+   * @return serverCert without transfering ownership.
    */
   Botan::X509_Certificate const *AuthKeys::getServerCert() const
   {
-    return serverCert;
+    return serverCert.get();
   }
 
   /**
    * @brief return a pointer to the Receiver's certificate.
    *
-   * @return receiverCert.
+   * @return receiverCert without transfering ownership.
    */
   Botan::X509_Certificate const *AuthKeys::getReceiverCert() const
   {
-    return receiverCert;
+    return receiverCert.get();
   }
 
   /**
    * @brief return a pointer to the Receiver's private key.
    *
-   * @return receiverPrivKey.
+   * @return receiverPrivKey without transfering ownership.
    */
   Botan::Private_Key *AuthKeys::getReceiverPrivKey() const
   {
-    return receiverPrivKey;
+    return receiverPrivKey.get();
   }
 }

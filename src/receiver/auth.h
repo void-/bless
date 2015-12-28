@@ -10,6 +10,7 @@
 #include <botan/x509cert.h>
 
 #include <istream>
+#include <memory>
 
 namespace Bless
 {
@@ -44,9 +45,9 @@ namespace Bless
       Botan::Private_Key *getReceiverPrivKey() const;
 
     private:
-      Botan::X509_Certificate const *serverCert;
-      Botan::X509_Certificate const *receiverCert;
-      Botan::Private_Key *receiverPrivKey;
+      std::unique_ptr<Botan::X509_Certificate const> serverCert;
+      std::unique_ptr<Botan::X509_Certificate const> receiverCert;
+      std::unique_ptr<Botan::Private_Key> receiverPrivKey;
   };
 }
 
