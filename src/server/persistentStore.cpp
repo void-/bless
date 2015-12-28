@@ -227,9 +227,17 @@ fail:
 
   /**
    * @brief destruct a MessageQueue and all its owned resources.
+   *
+   * All Messages in the underlying queue are owned, so delete them.
    */
   MessageQueue::~MessageQueue()
   {
+    while(realTimeMessages.size())
+    {
+      auto i = realTimeMessages.front();
+      realTimeMessages.pop();
+      delete i;
+    }
   }
 
   /**
