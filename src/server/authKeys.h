@@ -7,10 +7,12 @@
 #ifndef AUTHKEYS_H
 #define AUTHKEYS_H
 
+#include "persistentStore.h"
+
 #include <botan/x509cert.h>
 #include <botan/pk_keys.h>
 
-#include "persistentStore.h"
+#include <memory>
 
 namespace Bless
 {
@@ -33,11 +35,11 @@ namespace Bless
     public:
       virtual ~ConnectionKey();
 
-      Botan::X509_Certificate const *getCert();
       int init(std::string const &path);
+      Botan::X509_Certificate const *getCert();
 
     protected:
-      Botan::X509_Certificate const *cert;
+      std::unique_ptr<Botan::X509_Certificate const> cert;
   };
 
   /**
@@ -61,7 +63,7 @@ namespace Bless
       Botan::Private_Key *getPrivKey();
 
     private:
-      Botan::Private_Key *privKey;
+      std::unique_ptr<Botan::Private_Key> privKey;
   };
 }
 

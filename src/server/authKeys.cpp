@@ -22,7 +22,7 @@ namespace Bless
    */
   Botan::X509_Certificate const *ConnectionKey::getCert()
   {
-    return cert;
+    return cert.get();
   }
 
   /**
@@ -37,7 +37,7 @@ namespace Bless
   {
     try
     {
-      cert = new X509_Certificate(path);
+      cert = std::unique_ptr<X509_Certificate>(new X509_Certificate(path));
 
       //verify cert is self-signed and valid
       if(!(cert->is_self_signed() &&
@@ -93,7 +93,8 @@ namespace Bless
     //load the private key
     try
     {
-      privKey = PKCS8::load_key(privPath, rng);
+      privKey = std::unique_ptr<Botan::Private_Key>(
+        PKCS8::load_key(privPath, rng));
     }
     catch(Stream_IO_Error &e)
     {
@@ -122,6 +123,6 @@ namespace Bless
    */
   Botan::Private_Key *ServerKey::getPrivKey()
   {
-    return privKey;
+    return privKey.get();
   }
 }
