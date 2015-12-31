@@ -55,7 +55,7 @@ int main(int argc, char **argv)
 {
   int error = 0;
   Botan::AutoSeeded_RNG rng;
-  InMemoryMessageQueue messages;
+  FileMessageQueue messages;
   ReceiverMain recv;
   SenderMain sender;
   ServerKey keyToSender;
@@ -68,6 +68,13 @@ int main(int argc, char **argv)
   if((error = Log::init(logFile)))
   {
     std::cerr << "Failed to initialize log file: " << logFile << std::endl;
+    goto fail;
+  }
+
+  //initialize shared message queue
+  if((error = messages.init()))
+  {
+    std::cerr << "Failed to open message storage or init queue." << std::endl;
     goto fail;
   }
 
