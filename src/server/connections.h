@@ -33,9 +33,15 @@ namespace Bless
    * @brief interface for a concurrent context.
    *
    * Subclass and override run() to do something on a separate thread. Call
-   * start() to begin execution.
+   * start() to begin execution. Call join() or terminate() to stop.
    *
    * This allows for dividing initialization and execution.
+   *
+   * @var int Runnable::error
+   * @brief error code to be returned by run().
+   *
+   * @var bool Runnable::stop
+   * @brief condition that the underlying thread can use to exit.
    */
   class Runnable
   {
@@ -44,13 +50,19 @@ namespace Bless
       virtual ~Runnable();
 
       int start();
-      void join();
+      int terminate();
+      int join();
 
     protected:
       Runnable() = default;
-      virtual void run() = 0;
+      virtual int run() = 0;
 
+      bool stop = false;
       std::thread t;
+
+    private:
+      int error = 0;
+      void _run();
   };
 
   /**
@@ -196,7 +208,7 @@ namespace Bless
 
       void sendMessage(Message &m);
 
-      void run() override;
+      int run() override;
       ConnectionKey *receiverKey;
 
       std::mutex serverLock;
@@ -237,7 +249,7 @@ namespace Bless
 
       int init(MessageQueue *queue_, ServerKey *serverKey_,
         ConnectionKey *receiverKey_, Botan::RandomNumberGenerator *rng_);
-      void run() override;
+      int run() override;
 
       static const unsigned short port = 9549;
 
@@ -297,7 +309,7 @@ namespace Bless
         Botan::RandomNumberGenerator *rng_);
 
     protected:
-      void run() override;
+      int run() override;
 
       void send(const Botan::byte *const payload, size_t len);
 
@@ -348,7 +360,7 @@ namespace Bless
       static const unsigned short port = 9548;
 
     protected:
-      void run() override;
+      int run() override;
       static const int backlog = 32;
       static const unsigned int maxThreads = 2;
 

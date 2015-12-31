@@ -1,6 +1,8 @@
+#include <bless/log.h>
 #include "connections.h"
 
 #include <chrono> //for duration
+#include <cerrno>
 
 #include <poll.h>
 
@@ -26,16 +28,43 @@ namespace Bless
    */
   int Runnable::start()
   {
-    t = std::thread(&Runnable::run, this);
+    t = std::thread(&Runnable::_run, this);
     return 0;
   }
 
   /**
-   * @brief block until the underlying threads completes.
+   * @brief signal for the thread to stop, possibly blocking.
+   *
+   * @return any error code run() returned.
    */
-  void Runnable::join()
+  int Runnable::terminate()
+  {
+    //signal for the thread to stop
+    stop = true;
+
+    return join();
+  }
+
+  /**
+   * @brief block until the underlying threads completes.
+   *
+   * @return any error code run() returned.
+   */
+  int Runnable::join()
   {
     t.join();
+    return error;
+  }
+
+  /**
+   * @brief internal run function.
+   *
+   * This polymorphically calls subclass-defined run() and writes the result to
+   * error member variable.
+   */
+  void Runnable::_run()
+  {
+    error = this->run();
   }
 
   /**
@@ -822,7 +851,7 @@ fail:
    * - send the message to the Receiver with an exponential backoff
    * </p>
    */
-  void ReceiverChannel::run()
+  int ReceiverChannel::run()
   {
     decltype(std::chrono::system_clock::now()) addressTimeout;
     bool localReceiverAvailable = false;
@@ -830,7 +859,7 @@ fail:
     std::chrono::milliseconds delay(100);
     std::unique_ptr<Message> toSend;
 
-    while(true)
+    while(!stop)
     {
       //sleep if no Receiver is available
       if(!localReceiverAvailable)
@@ -866,6 +895,8 @@ fail:
         1; //replace with any(message error)
       //update a local bool to avoid locking the shared `receiverAvailable'
     }
+
+    return 0;
   }
 
   /**
@@ -943,19 +974,21 @@ fail:
    * If connect() fails, the received packet could have been garbage
    *   decide what to do on the different errors.
    */
-  void ReceiverMain::run()
+  int ReceiverMain::run()
   {
     sockaddr_in receiverAddress;
     ::socklen_t addrLen;
+    int error = 0;
+    Log &l = Log::getLog();
 
     //start the channel thread even with no connection
-    if(chan.start())
+    if((error = chan.start()))
     {
       //couldn't start the channel thread
       goto fail;
     }
 
-    while(true)
+    while(!stop)
     {
       addrLen = sizeof(receiverAddress);
       ::memset(&receiverAddress, 0, sizeof(receiverAddress));
@@ -966,21 +999,22 @@ fail:
           reinterpret_cast<sockaddr *>(&receiverAddress),
           &addrLen) == -1)
       {
+        l.error("recvfrom() failed, got error: ", errno);
         goto fail;
       }
 
       //a connection is ready for the channel, try to connect to it
-      if(chan.connect(receiverAddress))
+      if((error = chan.connect(receiverAddress)))
       {
         //XXX: do something more sophisticated- the packet could be ignored
         //goto fail;
+        l.log("chan.connect() failed with error ", error);
         continue;
       }
     }
 
 fail:
-    //XXX: do something with the error
-    return;
+    return error;
   }
 
   /**
@@ -1067,14 +1101,15 @@ fail:
    * - shutdown the connection
    * </p>
    */
-  void SenderChannel::run()
+  int SenderChannel::run()
   {
     std::unique_lock<std::mutex> lock;
     ::pollfd pollSocket;
     int error = 0;
     unsigned char readBuffer[bufferSize];
+    Log &l = Log::getLog();
 
-    while(true)
+    while(!stop)
     {
       lock = std::unique_lock<std::mutex>(*workLock);
       //wait until work is available
@@ -1232,9 +1267,9 @@ shutdown:
       }
 
       close(connection);
-
-      //do something with error
+      l.log("Connection ", connection, " had error ", error);
     }
+    return error;
   }
 
   /**
@@ -1447,12 +1482,13 @@ fail:
    * - load the new socket and Sender address to a work queue
    * </p>
    */
-  void SenderMain::run()
+  int SenderMain::run()
   {
     int conn;
     sockaddr_in addr;
     socklen_t len;
     std::unique_lock<std::mutex> lock;
+    Log &l = Log::getLog();
 
     //start all channel threads
     for(auto &c : channels)
@@ -1460,7 +1496,7 @@ fail:
       c.start();
     }
 
-    while(true)
+    while(!stop)
     {
       //reset length of address; the length written by accept() is ignored
       len = sizeof(addr);
@@ -1471,6 +1507,7 @@ fail:
           == -1)
       {
         //accept failed; try again?
+        l.log("accept() failed from SenderMain, with error ", errno);
         continue;
       }
 
@@ -1481,5 +1518,7 @@ fail:
       workReady.notify_one();
       lock.unlock();
     }
+
+    return 0;
   }
 }
