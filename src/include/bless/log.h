@@ -3,6 +3,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <ctime>
+#include <mutex>
 
 namespace Bless
 {
@@ -56,8 +59,10 @@ namespace Bless
     protected:
       virtual ~Log();
 
+      void logStart(std::string const &level);
+
       template<class... Args>
-      void logLevel(std::string const &level, Args...);
+      void logLevel(std::string const &level, Args... args);
 
       template<class First, class... Rest>
       void _log(First car, Rest... cdr);
@@ -66,6 +71,7 @@ namespace Bless
       void _log(Last last);
 
       std::fstream logFile;
+      std::mutex logLock;
     private:
       Log() = default;
 
@@ -73,5 +79,57 @@ namespace Bless
       static const std::string errorLevel;
       static Log instance;
   };
+
+  /**
+   * @brief log at the default level
+   */
+  template<class... Args>
+  void Log::log(Args... args)
+  {
+    logLevel(normalLevel, args...);
+  }
+
+  /**
+   * @brief log at the error level
+   */
+  template<class... Args>
+  void Log::error(Args... args)
+  {
+    logLevel(errorLevel, args...);
+  }
+
+  /**
+   * @brief internal logging implementation at an arbitrary level
+   *
+   * This is thread safe.
+   *
+   * @param level the information level to log at
+   */
+  template<class... Args>
+  void Log::logLevel(std::string const &level, Args... args)
+  {
+    std::lock_guard<std::mutex> lock(logLock);
+    logStart(level);
+    _log(args...);
+  }
+
+  /**
+   * @brief log a sequence of arguments in the general case
+   */
+  template<class First, class... Rest>
+  void Log::_log(First car, Rest... cdr)
+  {
+    logFile << car;
+    _log(cdr...);
+  }
+
+  /**
+   * @brief log the very last argument with a newline.
+   */
+  template<class Last>
+  void Log::_log(Last last)
+  {
+    logFile << last << "\n";
+  }
 }
 #endif //LOG_H
