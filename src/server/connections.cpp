@@ -854,10 +854,15 @@ fail:
   int ReceiverChannel::run()
   {
     decltype(std::chrono::system_clock::now()) addressTimeout;
-    bool localReceiverAvailable = false;
     std::chrono::milliseconds window(ReceiverChannel::locationTimeout);
     std::chrono::milliseconds delay(100);
     std::unique_ptr<Message> toSend;
+    //atomically initialize a local condition to the real condition
+    bool localReceiverAvailable;
+    {
+      std::lock_guard<std::mutex> lock(serverLock);
+      localReceiverAvailable = receiverAvailable;
+    }
 
     while(!stop)
     {
