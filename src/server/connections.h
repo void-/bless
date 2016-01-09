@@ -206,7 +206,7 @@ namespace Bless
       bool handshake(const Botan::TLS::Session &session);
       std::string nextProtocol(std::vector<std::string> protocols);
 
-      void sendMessage(Message &m);
+      void sendMessage(OpaqueMessage &m);
 
       int run() override;
       ConnectionKey *receiverKey;
@@ -327,7 +327,7 @@ namespace Bless
       std::mutex *workLock;
       std::condition_variable *workReady;
       std::queue<ChannelWork> *work;
-      std::unique_ptr<Message> partialMessage;
+      std::unique_ptr<OpaqueMessage> partialMessage;
   };
 
   /**

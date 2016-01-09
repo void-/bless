@@ -819,7 +819,7 @@ fail:
   }
 
   /**
-   * @brief send a Message \p m to the Receiver over the message channel.
+   * @brief send a OpaqueMessage \p m to the Receiver over the message channel.
    *
    * This abstracts serializing the message and actually sending it, incase
    * this needs to be mocked out.
@@ -828,7 +828,7 @@ fail:
    *
    * @param m the message to send.
    */
-  void ReceiverChannel::sendMessage(Message &m)
+  void ReceiverChannel::sendMessage(OpaqueMessage &m)
   {
     std::lock_guard<std::mutex> lock(serverLock);
     //TEST
@@ -856,7 +856,7 @@ fail:
     decltype(std::chrono::system_clock::now()) addressTimeout;
     std::chrono::milliseconds window(ReceiverChannel::locationTimeout);
     std::chrono::milliseconds delay(100);
-    std::unique_ptr<Message> toSend;
+    std::unique_ptr<OpaqueMessage> toSend;
     //atomically initialize a local condition to the real condition
     bool localReceiverAvailable;
     {
@@ -1165,7 +1165,7 @@ fail:
       //allocate a message to write to
       try
       {
-        partialMessage = std::unique_ptr<Message>(new Message());
+        partialMessage = std::unique_ptr<OpaqueMessage>(new OpaqueMessage());
       }
       catch(std::bad_alloc &e)
       {
@@ -1331,7 +1331,7 @@ shutdown:
    *
    * @invariant partialMessage always has a valid pointer.
    *
-   * @param payload some bytes of a Message from Sender.
+   * @param payload some bytes of a OpaqueMessage from Sender.
    * @param len length of \p payload in bytes.
    */
   void SenderChannel::recvData(const byte *const payload, size_t len)
@@ -1346,11 +1346,6 @@ shutdown:
       messageQueue->addMessage(std::move(partialMessage));
 
       //signal to shutdown the TLS server
-      server->close();
-    }
-    else if(status == -1)
-    {
-      //error in deserialization
       server->close();
     }
   }

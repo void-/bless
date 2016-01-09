@@ -89,15 +89,16 @@ namespace Bless
       virtual ~MessageStore();
 
       /**
-       * @brief add a new Message to the persistent store.
+       * @brief add a new OpaqueMessage to the persistent store.
        *
-       * @param msg Message to add. Ownership is still held by the caller.
+       * @param msg OpaqueMessage to add. Ownership is still held by the
+       *   caller.
        * @return non-zero on failure.
        */
-      virtual int append(Message &msg) = 0;
+      virtual int append(OpaqueMessage &msg) = 0;
 
       /**
-       * @brief yield the next Message from persistent store.
+       * @brief yield the next OpaqueMessage from persistent store.
        *
        * The backend persistent store contains stored Messages. next() returns
        * Messages until all from the persistent store have been returned. The
@@ -107,14 +108,14 @@ namespace Bless
        * Use end() to determine if next() still has Messages left to yeild.
        *
        * @warning only one thread should be calling this at any time.
-       * @return the next Message, unspecified behaviour on failure.
+       * @return the next OpaqueMessage, unspecified behaviour on failure.
        */
-      virtual std::unique_ptr<Message> next() = 0;
+      virtual std::unique_ptr<OpaqueMessage> next() = 0;
 
       /**
        * @brief determine if any messages remain in the persistent store.
        *
-       * @return true if calling next() won't return a valid Message.
+       * @return true if calling next() won't return a valid OpaqueMessage.
        */
       virtual bool end() = 0;
   };
@@ -140,8 +141,8 @@ namespace Bless
       int init(std::string const &file);
       int init();
 
-      int append(Message &msg) override;
-      std::unique_ptr<Message> next() override;
+      int append(OpaqueMessage &msg) override;
+      std::unique_ptr<OpaqueMessage> next() override;
       bool end() override;
 
     protected:
@@ -185,7 +186,7 @@ namespace Bless
        * @param msg the message to write; addMessage() takes ownership.
        * @return non-zero on failure.
        */
-      virtual int addMessage(std::unique_ptr<Message> &&msg) = 0;
+      virtual int addMessage(std::unique_ptr<OpaqueMessage> &&msg) = 0;
 
       /**
        * @brief return the size of the underlying queue.
@@ -200,24 +201,24 @@ namespace Bless
       /**
        * @brief return the next message from the message queue.
        *
-       * This synchronously gets the next Message off the realtime queue. If no
-       * Message is available, next() will block until either condition is
-       * met:\n
+       * This synchronously gets the next OpaqueMessage off the realtime queue.
+       * If no OpaqueMessage is available, next() will block until either
+       * condition is met:\n
        * - addMessage() returns on another thread
-       * - \p timeout elapses, in which case, a dummy Message is returned
+       * - \p timeout elapses, in which case, a dummy OpaqueMessage is returned
        *
        * This gives ownership of the message to the caller via unique_ptr.
        *
        * @param timeout maximum number of milliseconds to block during next().
        * @return the next message in the queue, giving ownership to the caller.
        */
-      virtual std::unique_ptr<Message> next(unsigned timeout) = 0;
+      virtual std::unique_ptr<OpaqueMessage> next(unsigned timeout) = 0;
 
     protected:
       std::mutex realTimeLock;
       std::condition_variable messageReady;
 
-      std::queue<Message *> realTimeMessages;
+      std::queue<OpaqueMessage *> realTimeMessages;
   };
 
   /**
@@ -231,8 +232,8 @@ namespace Bless
 
       int init();
 
-      int addMessage(std::unique_ptr<Message> &&msg) override;
-      std::unique_ptr<Message> next(unsigned timeout) override;
+      int addMessage(std::unique_ptr<OpaqueMessage> &&msg) override;
+      std::unique_ptr<OpaqueMessage> next(unsigned timeout) override;
   };
 
   /**
@@ -247,8 +248,8 @@ namespace Bless
       int init(std::string const &file);
       int init();
 
-      int addMessage(std::unique_ptr<Message> &&msg) override;
-      std::unique_ptr<Message> next(unsigned timeout) override;
+      int addMessage(std::unique_ptr<OpaqueMessage> &&msg) override;
+      std::unique_ptr<OpaqueMessage> next(unsigned timeout) override;
 
     private:
       FileMessageStore store;

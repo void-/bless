@@ -174,19 +174,13 @@ fail:
    * @param msg borrowed message to write out to the file.
    * @return non-zero on failure.
    */
-  int FileMessageStore::append(Message &msg)
+  int FileMessageStore::append(OpaqueMessage &msg)
   {
     std::lock_guard<decltype(backendLock)> lock(backendLock);
-    unsigned char buf[Message::size];
-
-    if(msg.serialize(buf, sizeof(buf)))
-    {
-      return -1;
-    }
 
     //seek, write, flush; saving the returned stream
     backend.seekp(0, std::ios_base::end)
-      .write(reinterpret_cast<char *>(buf), Message::size)
+      .write(reinterpret_cast<char *>(msg.data.data()), OpaqueMessage::size)
       .flush();
 
     //return 1 if the stream errored
@@ -194,11 +188,11 @@ fail:
   }
 
   /**
-   * @brief yield the next Message from the file.
+   * @brief yield the next OpaqueMessage from the file.
    *
-   * @return a Message, transfering ownership to the caller.
+   * @return a OpaqueMessage, transfering ownership to the caller.
    */
-  std::unique_ptr<Message> FileMessageStore::next()
+  std::unique_ptr<OpaqueMessage> FileMessageStore::next()
   {
 
   }
@@ -214,7 +208,7 @@ fail:
    * while(!store.end())
    * {
    *   auto m = store.next();
-   *   //do something with Message m
+   *   //do something with OpaqueMessage m
    * }
    * @endcode
    *
@@ -249,7 +243,7 @@ fail:
    * @param timeout maximum number of milliseconds to block during next().
    * @return the next message in the queue, giving ownership to the caller.
    */
-  std::unique_ptr<Message> MessageQueue::next(unsigned timeout)
+  std::unique_ptr<OpaqueMessage> MessageQueue::next(unsigned timeout)
   {
     std::unique_lock<decltype(realTimeLock)> lock(realTimeLock);
     std::chrono::milliseconds t(timeout);
@@ -263,13 +257,13 @@ fail:
     //no messages before the timeout: return a dummy
     if(!realTimeSize())
     {
-      return std::unique_ptr<Message>(new Message());
+      return std::unique_ptr<OpaqueMessage>(new OpaqueMessage());
     }
 
     //a message is available, remove it from the queue
     auto ret = realTimeMessages.front();
     realTimeMessages.pop();
-    return std::unique_ptr<Message>(ret);
+    return std::unique_ptr<OpaqueMessage>(ret);
   }
 
   /**
@@ -277,12 +271,6 @@ fail:
    */
   InMemoryMessageQueue::~InMemoryMessageQueue()
   {
-    while(realTimeMessages.size())
-    {
-      auto i = realTimeMessages.front();
-      realTimeMessages.pop();
-      delete i;
-    }
   }
 
   /**
@@ -306,7 +294,7 @@ fail:
    * @param msg the message to enqueue and take ownership of.
    * @return non-zero on failure.
    */
-  int InMemoryMessageQueue::addMessage(std::unique_ptr<Message> &&msg)
+  int InMemoryMessageQueue::addMessage(std::unique_ptr<OpaqueMessage> &&msg)
   {
     std::lock_guard<decltype(realTimeLock)> lock(realTimeLock);
     realTimeMessages.emplace(msg.release());
@@ -335,7 +323,7 @@ fail:
    * @return the next message or a dummy message, giving ownership to the
    *   caller.
    */
-  std::unique_ptr<Message> InMemoryMessageQueue::next(unsigned timeout)
+  std::unique_ptr<OpaqueMessage> InMemoryMessageQueue::next(unsigned timeout)
   {
     return MessageQueue::next(timeout);
   }
@@ -345,12 +333,6 @@ fail:
    */
   FileMessageQueue::~FileMessageQueue()
   {
-    while(realTimeMessages.size())
-    {
-      auto i = realTimeMessages.front();
-      realTimeMessages.pop();
-      delete i;
-    }
   }
 
   /**
@@ -391,11 +373,11 @@ fail:
    * @param msg the message to enqueue and take ownership of.
    * @return non-zero on failure.
    */
-  int FileMessageQueue::addMessage(std::unique_ptr<Message> &&msg)
+  int FileMessageQueue::addMessage(std::unique_ptr<OpaqueMessage> &&msg)
   {
     std::lock_guard<decltype(realTimeLock)> lock(realTimeLock);
     realTimeMessages.emplace(msg.release());
-    Message &m = *realTimeMessages.back(); //get a reference to the new message
+    OpaqueMessage &m = *realTimeMessages.back(); //get a ref to the new message
 
     //store the message and signal
     store.append(m);
@@ -414,87 +396,8 @@ fail:
    * @return the next message or a dummy message, giving ownership to the
    *   caller.
    */
-  std::unique_ptr<Message> FileMessageQueue::next(unsigned timeout)
+  std::unique_ptr<OpaqueMessage> FileMessageQueue::next(unsigned timeout)
   {
-    return MessageQueue::next(timeout);
-  }
-
-  /**
-   * @brief destruct the MessageQueue and all owned messages.
-   */
-  FileMessageQueue::~FileMessageQueue()
-  {
-    while(realTimeMessages.size())
-    {
-      auto i = realTimeMessages.front();
-      realTimeMessages.pop();
-      delete i;
-    }
-  }
-
-  /**
-   * @brief add \p msg to the realtime queue, taking ownership.
-   *
-   * Procedure:
-   * <p>
-   * - take ownership of \p msg
-   * - put it on the realtime queue
-   * - add the new message to the message store
-   * - signal messageReady
-   * </p>
-   *
-   * @param msg the message to enqueue and take ownership of.
-   * @return non-zero on failure.
-   */
-  int FileMessageQueue::addMessage(std::unique_ptr<Message> &&msg)
-  {
-    std::lock_guard<decltype(realTimeLock)> lock(realTimeLock);
-    realTimeMessages.emplace(msg.release());
-    Message &m = *realTimeMessages.back(); //get a reference to the new message
-
-    //store the message and signal
-    store.append(m);
-    MessageQueue::messageReady.notify_one();
-
-    return 0;
-  }
-
-  /**
-   * @brief return the number of realtime messages left.
-   *
-   * @return the number of messages in realTimeMessages.
-   */
-  size_t FileMessageQueue::realTimeSize() const noexcept
-  {
-    return realTimeMessages.size();
-  }
-
-  /**
-   * @brief return the next realtime message.
-   *
-   * If the underlying queue of messages is empty, a new, dummy message is
-   * returned by calling the Message constructor.
-   *
-   * @return the next message or a dummy message, giving ownership to the
-   *   caller.
-   */
-  std::unique_ptr<Message> FileMessageQueue::next()
-  {
-    //return a realtime message if available
-    if(realTimeSize())
-    {
-      auto ret = realTimeMessages.front();
-      realTimeMessages.pop();
-      return std::unique_ptr<Message>(ret);
-    }
-
-    //read an old message from the store if any are left
-    if(!store.end())
-    {
-      return store.next();
-    }
-
-    //no messages left at all; return a dummy
-    return std::unique_ptr<Message>(new Message());
+      return MessageQueue::next(timeout);
   }
 }
