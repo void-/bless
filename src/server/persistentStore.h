@@ -16,7 +16,20 @@
 #include <condition_variable>
 #include <list>
 #include <queue>
+#include <unordered_map>
 #include <fstream>
+
+namespace std
+{
+  template <>
+  struct hash<Bless::OpaqueEphemeralKey const *const>
+  {
+    size_t operator()(Bless::OpaqueEphemeralKey const *const p) const
+    {
+      return reinterpret_cast<size_t>(p);
+    }
+  };
+}
 
 namespace Bless
 {
@@ -71,6 +84,68 @@ namespace Bless
     private:
       std::string path;
       std::list<Botan::X509_Certificate> stagedIn;
+  };
+
+  /**
+   * @class EphemeralKeyStore
+   * @brief interface to storing ephemeral keys to give to the Sender.
+   *
+   * Threadsafe interface to get persistently stored ephemeral keys for
+   * Senders.
+   */
+  class EphemeralKeyStore
+  {
+    public:
+      virtual ~EphemeralKeyStore() = default;
+
+      /**
+       * @brief atomically get the next ephemeral key to give to a Sender.
+       *
+       * @return the next key.
+       */
+      virtual OpaqueEphemeralKey *next() = 0;
+
+      /**
+       * @brief permenantly delete a key because a Sender used it for
+       *   encryption.
+       *
+       * @param key the key, returned from next(), to delete.
+       * @return non-zero on failure.
+       */
+      virtual int free(OpaqueEphemeralKey *key) = 0;
+
+      /**
+       * @brief reuse a key yielded from next() because a Sender did not
+       *   successfully use it for encryption.
+       *
+       * @param key the key to reclaim to give out to another Sender.
+       * @return non-zero on failure.
+       */
+      virtual int release(OpaqueEphemeralKey *key) = 0;
+  };
+
+  /**
+   * @class FileSystemEphemeralKeyStore
+   * @brief implementation of EphemeralKeyStore that uses the filesystem as a
+   *   storage backend.
+   */
+  class FileSystemEphemeralStore : public EphemeralKeyStore
+  {
+    public:
+      FileSystemEphemeralStore() = default;
+      ~FileSystemEphemeralStore() override;
+
+      int init(std::string const &path);
+
+      OpaqueEphemeralKey *next() override;
+      int free(OpaqueEphemeralKey *key) override;
+      int release(OpaqueEphemeralKey *key) override;
+
+    private:
+      std::mutex keysLock;
+      std::queue<OpaqueEphemeralKey *> keys;
+      std::unordered_map<OpaqueEphemeralKey const *const, std::string> fileMap;
+      std::size_t outstandingKeys;
   };
 
   /**
