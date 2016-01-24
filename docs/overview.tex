@@ -1,5 +1,5 @@
 \documentclass[11pt]{article}
-\usepackage{tikz}
+\usepackage{amsmath,tikz}
 
 \usetikzlibrary{arrows}
 
@@ -112,36 +112,19 @@ Receiver using this channel even though the Receiver isn't listening.
 \end{itemize}
 \pagebreak
 
-%FIXME: Below is old and wrong
+%XXX: Needs accompanying explanation
 \section*{Message format}
-%Can this use some form of OTR or a ratchet?
-\subsection*{Sender $\rightarrow$ Server}
 \begin{tabular}{c c c}
-  $Sig_{k_{sender}}\left(mail\right)$ & $256$B &
-    Signature of the entire rest of the mail contents\\
-  $E_{k_{server}}\left(k_{sym}\right)$ & $256$B &
-    Encryption of a symmetric key under the Server's public key\\
-  $E_{k_{sym}}\left(m\right)$ & $\left[0, 2^{16} - 512 \right]$B &
-    Encryption of the message with the symmetric key
+  $H(\text{Sender Cert})$ & $32$B &
+    Hash of Sender's Certificate \\
+  $E_{\text{receiver}}$ & $32$B &
+    Receiver's ephemeral key issued to the Sender. \\
+  $E_{\text{sender}}$ & $32$B &
+    Sender's generated ephemeral key \\
+  $Sig_{\text{sender}}\left(E_{\text{sender}}\right)$ & $32$B &
+    Signed ephemeral key \\
+  $AEAD_{s}\left(m\right)$ & $384$B &
+    Encrypted message \\
 \end{tabular}
-The current design uses deterministic encryption. It will not prevent replay
-attacks.
-
-\subsection*{Server $\rightarrow$ Receiver}
-
-\subsection*{Steps from Server $\rightarrow$ Receiver}
-\begin{itemize}
-  \item Receiver establishes TCP connection to Server
-  \item Diffie-Hellman key exchange between Server and Receiver yields
-  $k_{mac}$ and $k_{enc}$
-  \item Close TCP connection and create UDP hole punch
-  %use OTR here by tricks with the mac key
-  \item Receiver receives, over UDP,
-    $E_{k_{mac}}\left(E_{k_{enc}}\left(P\right)\right),
-    E_{k_{enc}}\left(P\right)$,
-    where $P$ is the payload from the Sender
-  \item Receiver send $k_{mac}$ acheiving the OTR property
-
-\end{itemize}
 
 \end{document}
