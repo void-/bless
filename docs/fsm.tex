@@ -7,57 +7,62 @@
 
 \section*{FSM for Server}
 \begin{tikzpicture}
-\node[draw, circle, scale=2] at (0,8.5) (down) {down};
-\node[draw, circle, scale=2] at (0,5) (upUk) {up:?};
-\node[draw, circle, scale=2] at (0,0) (upK) {up:!};
+\node[draw, circle, xscale=2, yscale=1.2] at (0,5) (no) {No Receiver};
+\node[draw, circle, xscale=2, yscale=1.2] at (0,0) (yes) {Yes Receiver};
 
-\draw[arrows={-latex}, line width=.5mm, scale=2] (down) to (upUk);
-%location unknown to known
+%new receiver successfully connects
 \draw[arrows={-latex}, line width=.5mm, scale=2]
-  (upUk) to [out=330, in=15] node[right] {Location report} (upK);
-%known -> unknown
+  (no) to [out=280, in=80] node[right] {new receiver} (yes);
+%sending message fails
 \draw[arrows={-latex}, line width=.5mm, scale=2]
-  (upK) to [out=165, in=210] node[left] {recv mail, delivery failure} (upUk);
+  (yes) to [out=165, in=210] node[left] {send fails} (no);
+%address timeout
+\draw[arrows={-latex}, line width=.5mm, scale=2]
+  (yes) to [out=35, in=340] node[right] {2h passes} (no);
 
-\path[arrows={-latex}, out=230, in=250, distance=30mm, line width=.5mm]
-  (upK) edge[loop] node[below] {Refresh connection} (upK);
+%self-edges
+\path[arrows={-latex}, out=245, in=265, distance=30mm, line width=.5mm]
+  (yes) edge[loop] node[below] {msg available/send msg} (yes);
 \path[arrows={-latex}, out=300, in=320, distance=30mm, line width=.5mm]
-  (upK) edge[loop] node[right] {recv mail, delivery success} (upK);
-
-\path[arrows={-latex}, out=160, in=180, distance=30mm, line width=.5mm]
-  (upUk) edge[loop] node[left] {recv mail, leave message} (upUk);
+  (yes) edge[loop] node[right] {30s passes/heartbeat} (yes);
+\path[arrows={-latex}, out=200, in=220, distance=40mm, line width=.5mm]
+  (yes) edge[loop] node[left] {new receiver} (yes);
 
 \end{tikzpicture}
 
 \subsection*{States}
 \begin{itemize}
-\item down \\
-The service on the Server is not running.
-\item up:? \\
-The Server is running, but the message channel is down. A `?' means the routing
-address of the Receiver is not known.
-\item up:! \\
-The Server is running and it has establish a message channel with the Receiver.
+\item No Receiver \\
+From the perspective of the Server, the message channel is down, i.e. there is
+  no Receiver connected
+\item Yes Receiver \\
+The message channel is up. The Receiver has connected to the Server recently
+and messages should be sent. The Server remains in this state even if the
+message channel goes stale.
 \end{itemize}
 
-\subsection*{Recv mail, leave message}
-The Sender sends mail to the Server but the message channel is down. The server
-saves the message and delivers it when the message channel is next established.
-\subsection*{Recv mail, delivery failure}
-The Sender sends mail to the Server. The Server attempts to deliver it to the
-Receiver, but the message channel was stale(i.e. the Receiver moved). The
-Server saves the message and delivers it when the message channel is next
+\subsection*{Transitions}
+\begin{itemize}
+\item No $\rightarrow$ Yes, ``new receiver`` \\
+A Receiver successfully connects to the server; the message channel is
 established.
-\subsection*{Refresh connection}
-The Server sends a refresh message over the message channel to keep the
-connection open. This is for NAT traversal to prevent the initial connection
-from being killed.
-\subsection*{Recv mail, delivery success}
-The Sender sends mail to the Server. The Server successfully delivers it to the
-Receiver and the message channel remains established.
-\subsection*{Location report}
-The Receiver transitions from down to up and the message channel is
-established.
+\item Yes $\rightarrow$ No, ``send fails'' \\
+A message is sent across the message channel but results in \textit{ICMP
+unreachable} likely because the underlying holepunch closed.
+\item Yes $\rightarrow$ No, ``2h passes'' \\
+The \textit{Address timeout} is exceeded. The Server assumes a Receiver will
+stay connected to a particular NAT for at most two hours.
+\item Yes $\rightarrow$ Yes, ``new receiver'' \\
+The Receiver successfully connects from behind a different NAT. The previous
+message channel is replaced for the new one.
+\item Yes $\rightarrow$ Yes, ``msg available/send msg'' \\
+A Sender sends a message to the Server. This message is sent via the message
+channel to the Receiver.
+\item Yes $\rightarrow$ Yes, ``30s passes/heartbeat'' \\
+The Server received no messages within a thirty second window. A heartbeat
+message is sent over the message channel to the Receiver to keep the holepunch
+open.
+\end{itemize}
 
 \pagebreak
 
@@ -66,35 +71,25 @@ established.
 \node[draw, circle, scale=2] at (0,4) (off) {offline};
 \node[draw, circle, scale=2] at (0,0) (on) {online};
 \draw[arrows={-latex}, line width=.5mm, scale=2] (off) to [out=195, in=165]
-  node[left] {Reveal location} (on);
+  node[left] {connect} (on);
 %self edge
 \path[arrows={-latex}, out=250, in=270, distance=30mm, line width=.5mm]
-  (on) edge[loop] node[below] {Receive Message} (on);
+  (on) edge[loop] node[below] {receive msg} (on);
 \draw[arrows={-latex}, line width=.5mm, scale=2] (on) to [out=15, in=-15]
-  node[right] {Move} (off);
+  node[right] {move} (off);
 \end{tikzpicture}
 
-\subsection*{Reveal location}
-The Receiver makes an initial connection to Server, bootstraping the message
+\subsection*{Transitions}
+\begin{itemize}
+\item offline $\rightarrow$ online ``connect'' \\
+The Receiver makes an initial connection to Server, opening a fresh message
 channel.
-\subsection*{Receive Message}
-The Server sends a message to the Receiver via the message channel and authenticates
-it.
-\subsection*{Move}
+\item online $\rightarrow$ online ``receive msg'' \\
+The Server sends a message, either a heartbeat or forwarded from a Sender, via
+the message channel to the Receiver.
+\item online $\rightarrow$ offline ``move'' \\
 The Receiver moves, connecting to a different network or otherwise not
-listening on the message channel.
-
-\pagebreak
-
-\section*{FSM for Sender}
-\begin{tikzpicture}
-\node[draw, circle, scale=2] at (0,0) (online) {online};
-\path[arrows={-latex}, out=40, in=60, distance=60mm, line width=.5mm]
-  (online) edge[loop] node[right] {Send mail} (online);
-\end{tikzpicture}
-
-\subsection*{Send mail}
-The Sender sends an authenticated mail to the Server. It will either fail, if
-the Server is down or the routing address is stale, or succeed.
-
+listening on the message channel. This transition is not communicated to the
+Server: this is key in the correctness of the protocol.
+\end{itemize}
 \end{document}
