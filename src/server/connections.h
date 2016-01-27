@@ -270,6 +270,8 @@ namespace Bless
    */
   struct ChannelWork
   {
+    ChannelWork() = default;
+
     ChannelWork(int &conn_, sockaddr_in &sender_) :
         conn(conn_), sender(sender_)
     {
@@ -304,7 +306,7 @@ namespace Bless
       ~SenderChannel();
 
       int init(ServerKey *serverKey_, MessageQueue *messageQueue_,
-        KeyStore *store_, std::mutex *workLock_,
+        KeyStore *store_, EphemeralKeyStore *keys_, std::mutex *workLock_,
         std::condition_variable *workReady_, std::queue<ChannelWork> *work_,
         Botan::RandomNumberGenerator *rng_);
 
@@ -324,6 +326,7 @@ namespace Bless
 
     private:
       KeyStore *store;
+      EphemeralKeyStore *keys;
       std::mutex *workLock;
       std::condition_variable *workReady;
       std::queue<ChannelWork> *work;
@@ -355,7 +358,8 @@ namespace Bless
       SenderMain() = default;
       ~SenderMain();
       int init(MessageQueue *queue_, ServerKey *serverKey_,
-        KeyStore *store_, Botan::RandomNumberGenerator *rng_);
+        KeyStore *store_, EphemeralKeyStore *keys_,
+        Botan::RandomNumberGenerator *rng_);
 
       static const unsigned short port = 9548;
 
@@ -366,6 +370,7 @@ namespace Bless
 
     private:
       KeyStore *store;
+      EphemeralKeyStore *keys;
 
       std::array<SenderChannel, maxThreads> channels;
       std::mutex workLock;

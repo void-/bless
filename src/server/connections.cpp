@@ -1048,13 +1048,14 @@ fail:
    * @param messageQueue_ queue to write Receiver-bound messages to from
    *   Senders.
    * @param store_ KeyStore to validate Sender certificates.
+   * @param keys_ EphemeralKeyStore that stores keys to give to Senders.
    * @param workLock_ lock to \p work_.
    * @param workReady_ condition variable to \p work_.
    * @param work_ queue to process new Sender connections from.
    * @return non-zero on failure.
    */
   int SenderChannel::init(ServerKey *serverKey_, MessageQueue *messageQueue_,
-      KeyStore *store_, std::mutex *workLock_,
+      KeyStore *store_, EphemeralKeyStore *keys_, std::mutex *workLock_,
       std::condition_variable *workReady_, std::queue<ChannelWork> *work_,
       RandomNumberGenerator *rng_)
   {
@@ -1064,6 +1065,7 @@ fail:
     serverKey = serverKey_;
     messageQueue = messageQueue_;
     store = store_;
+    keys = keys_;
     workLock = workLock_;
     workReady = workReady_;
     work = work_;
@@ -1109,13 +1111,26 @@ fail:
   int SenderChannel::run()
   {
     std::unique_lock<std::mutex> lock;
+    OpaqueEphemeralKey *key;
     ::pollfd pollSocket;
-    int error = 0;
+    ChannelWork sender;
+    int error;
     unsigned char readBuffer[bufferSize];
     Log &l = Log::getLog();
 
     while(!stop)
     {
+      error = 0;
+
+      //get the next ephemeral key
+      key = keys->next();
+      if(key == nullptr)
+      {
+        //out of keys: don't accept any more connections
+        error = -100;
+        goto shutdown;
+      }
+
       lock = std::unique_lock<std::mutex>(*workLock);
       //wait until work is available
       while(work->size() == 0)
@@ -1124,7 +1139,7 @@ fail:
       }
 
       //remove a work item = a connection to handle
-      ChannelWork sender = work->front();
+      sender = work->front();
       work->pop();
       //assign member variable for server lambdas; inside lock for destructor
       connection = sender.conn;
@@ -1218,7 +1233,10 @@ fail:
         }
       }
 
-      //secure connection established; read data from the Sender
+      //secure connection established; write out next ephemeral key
+      server->send(key->data.data(), key->data.size());
+
+      //read data from the Sender
       while(server->is_active())
       {
         if(::poll(&pollSocket, 1u, timeout) != 1)
@@ -1271,8 +1289,22 @@ shutdown:
         partialMessage.reset();
       }
 
+      //free the key
+      if(key)
+      {
+        //error occurred, only release() the key
+        if(error)
+        {
+          keys->release(key);
+        }
+        else
+        {
+          //no error, the key was used successfully
+          keys->free(key);
+        }
+      }
+
       close(connection);
-      l.log("Connection ", connection, " had error ", error);
     }
     return error;
   }
@@ -1399,11 +1431,13 @@ shutdown:
    * @param queue_ parameter to MainConnection::init.
    * @param serverKey_ parameter to MainConnection::init.
    * @param store_ KeyStore that stores Sender certificates.
+   * @param keys_ EphemeralKeyStore that stores keys to give to Senders.
    * @param rng_ parameter to MainConnection::init.
    * @return non-zero on failure.
    */
   int SenderMain::init(MessageQueue *queue_, ServerKey *serverKey_,
-      KeyStore *store_, RandomNumberGenerator *rng_)
+      KeyStore *store_, EphemeralKeyStore *keys_,
+      RandomNumberGenerator *rng_)
   {
     ::sockaddr_in addr;
     int sockOption = 1;
@@ -1417,12 +1451,13 @@ shutdown:
     }
 
     store = store_;
+    keys = keys_;
 
     //initialize all channel threads
     for(auto &c : channels)
     {
-      if(c.init(serverKey, queue, store, &workLock, &workReady, &connections,
-          rng))
+      if(c.init(serverKey, queue, store, keys,
+          &workLock, &workReady, &connections, rng))
       {
         error = -6;
         goto fail;

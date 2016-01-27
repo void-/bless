@@ -30,6 +30,7 @@ std::string defaultServerReceiverKey = RESOURCE_PATH"server.pem";
 std::string defaultServerReceiverCert = RESOURCE_PATH"serverCert.pem";
 std::string defaultReceiverCert = RESOURCE_PATH"receiverCert.pem";
 std::string defaultSenderCert = RESOURCE_PATH;
+std::string defaultEphemeralKeys = RESOURCE_PATH"/keys/";
 
 std::string logFile = RESOURCE_PATH"log";
 
@@ -64,6 +65,7 @@ int main(int argc, char **argv)
   ServerKey keyToReceiver;
   ConnectionKey receiverKey;
   FileSystemStore store;
+  FileSystemEphemeralStore ephemeralKeys;
   std::unique_lock<std::mutex> waitLock;
 
   //initialize the log
@@ -113,6 +115,13 @@ int main(int argc, char **argv)
     goto fail;
   }
 
+  //load Sender ephemeral key store
+  if((error = ephemeralKeys.init(defaultEphemeralKeys)))
+  {
+    std::cerr << "Couldn't load ephemeral key store." << std::endl;
+    goto fail;
+  }
+
   //initialize main connection threads
   if((error = recv.init(&messages, &keyToReceiver, &receiverKey, &rng)))
   {
@@ -121,7 +130,8 @@ int main(int argc, char **argv)
   }
 
   //initialize thread for handling connections to Sender
-  if((error = sender.init(&messages, &keyToSender, &store, &rng)))
+  if((error = sender.init(&messages, &keyToSender, &store, &ephemeralKeys,
+      &rng)))
   {
     std::cerr << "Failed to initialize Sender main." << std::endl;
     goto fail;
