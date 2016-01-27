@@ -1,6 +1,9 @@
 #include "persistentStore.h"
 
+#include <bless/log.h>
+
 #include <sys/types.h> //for opendir
+#include <cstdio> //for remove
 #include <dirent.h>
 
 using namespace Botan;
@@ -117,6 +120,185 @@ fail:
 
     //if the cert is valid, return 0
     return valid ? 0 : -1;
+  }
+
+  /**
+   * @brief delete the ephemeral key store.
+   */
+  FileSystemEphemeralStore::~FileSystemEphemeralStore()
+  {
+    std::lock_guard<std::mutex> lock(keysLock);
+    Log &log = Log::getLog();
+
+    //check if all keys have been returned
+    if(outstandingKeys != 0)
+    {
+      log.log("FileSystemEphemeralStore outstanding keys != 0: ",
+        outstandingKeys);
+    }
+  }
+
+  /**
+   * @brief load ephemeral keys as individual files from the filesystem given a
+   *   directory path.
+   *
+   * @param path the directory path to load from.
+   * @return non-zero on failure
+   */
+  int FileSystemEphemeralStore::init(std::string const &path)
+  {
+    int error = 0;
+    ::dirent *entry;
+    Log &log = Log::getLog();
+    ::DIR *dir = ::opendir(path.c_str());
+    outstandingKeys = 0;
+
+    if(dir == nullptr)
+    {
+      //couldn't open directory
+      error = -1;
+      goto fail;
+    }
+
+    //load every file as an ephemeral key
+    while((entry = readdir(dir)) != nullptr)
+    {
+      //unique_ptr ensures k is never leaked; release when passing to queue/map
+      std::unique_ptr<OpaqueEphemeralKey> k(new OpaqueEphemeralKey());
+      std::string name(entry->d_name);
+      OpaqueEphemeralKey *rawK;
+
+      //deserialization failed, try the next file
+      if(k->deserialize(name))
+      {
+        log.log("Failed to load ephemeral key file ", name);
+        continue;
+      }
+
+      //add key and filename to store
+      rawK = k.release();
+      keys.push(rawK);
+      fileMap.insert(std::pair<OpaqueEphemeralKey const *const, std::string>(
+        rawK, name));
+    }
+
+    //no keys were loaded
+    if(!keys.size())
+    {
+      error = -2;
+      goto fail;
+    }
+
+fail:
+    //close the directory ignoring errors
+    ::closedir(dir);
+    return error;
+  }
+
+  /**
+   * @brief return the next ephemeral key from the backend.
+   *
+   * If the key was used by a Sender, call free() on the returned pointer.
+   * If there was an error with the connection to the Sender, i.e. the key was
+   * not used, call release() on the returned pointer so it may be reused.
+   *
+   * @invariant cursor is always pointing to the next key to return.
+   *
+   * @return an ephemeral key, ownership is not transfered, nullptr if no keys
+   *   are left.
+   */
+  OpaqueEphemeralKey *FileSystemEphemeralStore::next()
+  {
+    std::lock_guard<std::mutex> lock(keysLock);
+
+    //if no more keys are left, return null
+    if(keys.size() == 0)
+    {
+      return nullptr;
+    }
+
+    //get the front key off the queue
+    auto k = keys.front();
+    keys.pop();
+    outstandingKeys++;
+
+    return k;
+  }
+
+  /**
+   * @brief delete an ephemeral key returned by next().
+   *
+   * This removes it from both the keys list and deletes the file.
+   *
+   * Don't lock because the keys list is not accessed.
+   *
+   * @param key the key to delete forever.
+   * @return non-zero on failure.
+   */
+  int FileSystemEphemeralStore::free(OpaqueEphemeralKey *key)
+  {
+    if(outstandingKeys == 0)
+    {
+      //free() called before next()
+      return -2;
+    }
+
+    //lookup the key in the map
+    auto it = fileMap.find(key);
+    if(it == fileMap.end())
+    {
+      //key not found
+      return -1;
+    }
+
+    //delete the underlying file
+    int ret = std::remove(it->second.c_str());
+    if(ret)
+    {
+      //failed to delete file
+      return -3;
+    }
+
+    //clear the map and deallocate the key itself
+    fileMap.erase(it);
+    delete key;
+    outstandingKeys--;
+
+    return 0;
+  }
+
+  /**
+   * @brief mark a key returned by next() as unused.
+   *
+   * Lock because the list is modified.
+   *
+   * Simply reinsert the given key into the queue, first performing safety
+   * checks.
+   *
+   * @param key the key to reuse
+   * @return non-zero on failure.
+   */
+  int FileSystemEphemeralStore::release(OpaqueEphemeralKey *key)
+  {
+    std::lock_guard<std::mutex> lock(keysLock);
+    if(outstandingKeys == 0)
+    {
+      //release() called before next()
+      return -2;
+    }
+
+    //lookup the key in the map
+    auto it = fileMap.find(key);
+    if(it == fileMap.end())
+    {
+      //key not found
+      return -1;
+    }
+
+    keys.push(key);
+    outstandingKeys--;
+
+    return 0;
   }
 
   /**
