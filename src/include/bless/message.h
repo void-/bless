@@ -1,12 +1,72 @@
 #ifndef MESSAGE_H
 #define MESSAGE_H
 
+#include <botan/pk_keys.h>
+#include <botan/x509cert.h>
+#include <botan/curve25519.h>
+
 #include <cstdint> //for size_t
 #include <array>
 #include <istream>
 
 namespace Bless
 {
+  /**
+   * @class OpaqueEphemeralKey
+   * @brief EphemeralKey in serialized form
+   */
+  class OpaqueEphemeralKey
+  {
+    public:
+      OpaqueEphemeralKey() = default;
+      int deserialize(std::string const &file);
+      int deserialize(unsigned char const *const data, std::size_t len);
+
+      static const std::size_t keySize = 32;
+      static const std::size_t sigSize = 32;
+      std::array<unsigned char, keySize+sigSize> data;
+  };
+
+  /**
+   * @class EphemeralKey
+   * @brief signed public diffie hellman key.
+   */
+  class EphemeralKey
+  {
+  };
+
+  /**
+   * @class OpaqueMessage
+   * @brief encrypted Message that travels over the wire.
+   *
+   * To turn a sequence of bytes into a full OpaqueMessage, use deserialize().
+   * This will indiciate when the message is fully deserialized and no more
+   * bytes are needed off the wire.
+   *
+   * Example
+   * @code
+   * OpaqueMessage m;
+   * unsigned char buffer[64];
+   * size_t len;
+   * int socket;
+   * ...
+   * do
+   * {
+   *   len = read(socket, buffer, sizeof(buffer));
+   * } while(m.deserialize(buffer, len));
+   * ... //m is complete
+   * send(socket, m.data.data(), m.data.size(), 0);
+   * @endcode
+   */
+  struct OpaqueMessage
+  {
+    int deserialize(unsigned char const *const data_, std::size_t len);
+
+    static const std::size_t size = 512;
+    std::array<unsigned char, size> data;
+    std::size_t filled = 0;
+  };
+
   /**
    * @class Message
    * @brief represents an encrypted message between the Sender and Receiver.
