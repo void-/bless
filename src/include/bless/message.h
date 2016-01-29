@@ -22,6 +22,9 @@ namespace Bless
       int deserialize(std::string const &file);
       int deserialize(unsigned char const *const data, std::size_t len);
 
+      unsigned char *getKey() const;
+      unsigned char *getSig() const;
+
       static const std::size_t keySize = 32;
       static const std::size_t sigSize = 32;
       std::array<unsigned char, keySize+sigSize> data;
@@ -33,7 +36,17 @@ namespace Bless
    */
   class EphemeralKey
   {
+    public:
+      EphemeralKey() = default;
+      int init(OpaqueEphemeralKey const &serialized,
+        Botan::Public_Key const &verify);
+
+      static const std::string emsa;
+
+      std::unique_ptr<Botan::Curve25519_PublicKey> key;
+      std::array<unsigned char, 32> sig;
   };
+  const std::string EphemeralKey::emsa = "EMSA3(SHA-256)";
 
   /**
    * @class OpaqueMessage
