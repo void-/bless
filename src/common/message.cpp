@@ -1,13 +1,188 @@
 #include <bless/message.h>
 
+#include <botan/pubkey.h>
+#include <botan/hex.h>
+#include <botan/sha2_32.h>
+#include <botan/kdf2.h>
+#include <botan/chacha20poly1305.h>
+
+#include <fstream>
+
+using namespace Botan;
+
 namespace Bless
 {
+  const std::string EphemeralKey::emsa = "EMSA1(SHA-256)";
+
   /**
-   * @brief construct a default message.
+   * @brief deserialize a message with a fragment of data in \p data.
+   *
+   * @warning This is not thread safe.
+   *
+   * If \p len is longer than the remaining number of bytes needed to
+   * deserialize the message, this is not an error.
+   *
+   * @param data next piece of data to deserialize.
+   * @param len length, in bytes, of \p data.
+   * @return 0 when fully deserialized, non-zero when incomplete.
    */
-  Message::Message() : filled(0)
+  int OpaqueMessage::deserialize(unsigned char const *const data_,
+      std::size_t len)
   {
-    data.fill(0);
+    //copy given payload into message
+    for(std::size_t i = 0; (i < len) && ((filled) < data.size()); ++i)
+    {
+      data[filled] = data_[i];
+      ++filled;
+    }
+
+    return filled < data.size();
+  }
+
+  /**
+   * @brief load a serialized EphemeralKey from a file
+   *
+   * @param file the file to open and load the key from
+   * @return non-zero on failure
+   */
+  int OpaqueEphemeralKey::deserialize(std::string const &file)
+  {
+    std::ifstream f(file);
+
+    //failed to open file
+    if(!f)
+    {
+      return -1;
+    }
+
+    //load in the serialized key
+    f.read((char *)(getKey()), keySize);
+
+    //check if all the bytes were read
+    if(static_cast<std::size_t>(f.gcount()) != keySize)
+    {
+      return -2;
+    }
+
+    //load in the serialized signature
+    f.read((char *)(getSig()), sigSize);
+
+    //check if all the bytes were read
+    if(static_cast<std::size_t>(f.gcount()) != sigSize)
+    {
+      return -3;
+    }
+
+    //return 0 if all bytes were read
+    return f.eof();
+  }
+
+  /**
+   * @brief get pointer to key in data blob.
+   *
+   * @return pointer to blob of size keySize.
+   */
+  unsigned char *OpaqueEphemeralKey::getKey() const
+  {
+    return const_cast<unsigned char *>(data.data());
+  }
+
+  /**
+   * @brief get pointer to signature in data blob.
+   *
+   * @return pointer to blob of size sigSize.
+   */
+  unsigned char *OpaqueEphemeralKey::getSig() const
+  {
+    return const_cast<unsigned char *>(sigSize + data.data());
+  }
+
+  /**
+   * @brief destruct EphemeralKey, zeroing the signature
+   */
+  EphemeralKey::~EphemeralKey()
+  {
+    sig.fill(0);
+  }
+
+  /**
+   * @brief deserialize an OpaqueEphemeralKey and verify its signature.
+   *
+   * @param serialized the key to deserialize into this.
+   * @param verify public signing key presumably used to sign this key.
+   * @return non-zero on failure
+   */
+  int EphemeralKey::init(OpaqueEphemeralKey const &serialized,
+      Public_Key const &verify)
+  {
+    //construct a signature verifier from given public key
+    PK_Verifier v(verify, emsa);
+
+    //check the signature in the key
+    if(!v.verify_message(serialized.getKey(), OpaqueEphemeralKey::keySize,
+          serialized.getSig(), OpaqueEphemeralKey::sigSize))
+    {
+      return -1;
+    }
+
+    //convert std::array into secure_vector to construct key
+    secure_vector<byte> keyBytes;
+    if(buffer_insert(keyBytes, 0, serialized.getKey(),
+        OpaqueEphemeralKey::keySize) != 0)
+    {
+      return -2;
+    }
+
+    key = std::unique_ptr<Curve25519_PublicKey>(
+      new Curve25519_PublicKey(keyBytes));
+
+    return 0;
+  }
+
+  /**
+   * @brief generate and sign a new Ephemeral key pair
+   *
+   * @param sigKey key to sign with
+   * @param rng random number generator for generation and signature
+   * @return non-zero on failure
+   */
+  int EphemeralKey::init(Private_Key &sigKey, RandomNumberGenerator &rng)
+  {
+    //generate key pair
+    key.reset(new Curve25519_PrivateKey(rng));
+
+    //sign public half
+    PK_Signer sign(sigKey, emsa);
+    std::vector<byte> rawSig = sign.sign_message(key->public_value(), rng);
+
+    if(rawSig.size() != sig.size())
+    {
+      //signature was unexpected length
+      return -1;
+    }
+
+    //write rawSig out to sig member variable
+    copy_mem(sig.data(), rawSig.data(), sig.size());
+
+    return 0;
+  }
+
+  /**
+   * @brief serialize an EphemeralKey directly to a buffer of length
+   *   OpaqueEphemeralKey::len
+   *
+   * @param out buffer to write out, OpaqueEphemeralKey::len bytes long
+   * @return number of bytes written
+   */
+  size_t EphemeralKey::serialize(unsigned char *out) const
+  {
+    std::vector<byte> keyBytes = key->public_value();
+
+    copy_mem(out, keyBytes.data(), OpaqueEphemeralKey::keySize);
+    copy_mem(&out[OpaqueEphemeralKey::keySize], sig.data(),
+      OpaqueEphemeralKey::sigSize);
+
+    return OpaqueEphemeralKey::len;
   }
 
   /**
@@ -15,82 +190,149 @@ namespace Bless
    */
   Message::~Message()
   {
-    data.fill(0);
+    senderId.fill(0);
+    keyId.fill(0);
+    nonce.fill(0);
   }
 
   /**
-   * @brief construct an example message given a string
+   * @brief init and encrypt a message given a stream to read from.
+   *
+   * Procedure:
+   * - hash sender's certificate
+   * - generate and sign Sender ephemeral key pair
+   * - generate encryption nonce
+   * - read message data from \p in
+   *
+   * @param in stream to read data to encrypt from
+   * @param sigKey private half to \p senderCert, use to sign an EphemeralKey
+   * @param senderCert cert to hash and identify who signed \p receiverKey
+   * @param rng random number generator needed for encryption
+   * @return non-zero on failure
    */
-  Message::Message(std::string const &data) : Message()
+  int Message::init(std::istream &in, Private_Key &sigKey,
+      X509_Certificate &senderCert, RandomNumberGenerator &rng)
   {
-    for(std::size_t i = 0; i < std::min(data.size(), this->data.size()); ++i)
+    //senderId = sha256 of Sender's certificate
+    std::string certId = senderCert.fingerprint("SHA-256");
+    if(hex_decode(senderId.data(), certId, false) != senderId.size())
     {
-      this->data[i] = data[i];
+      //wrote out an unexpected number of bytes
+      return -5;
     }
 
-    //pad out the end
-    for(std::size_t i = std::min(data.size(), this->data.size());
-        i < this->data.size(); ++i)
+    //generate ephemeral key for the Sender
+    if(int error = senderKey.init(sigKey, rng))
     {
-      this->data[i] = '\0';
+      return error;
     }
-  }
 
-  /**
-   * @brief construct a message given a stream to read from.
-   */
-  Message::Message(std::istream &in) : Message()
-  {
+    //fill nonce
+    rng.randomize(nonce.data(), nonce.size());
+
+    //read bytes from the user
+    data.resize(dataSize);
     in.read((char *)(data.data()), data.size());
+    return in.good();
   }
 
   /**
-   * @brief serialize a Message to a given buffer.
+   * @brief serialize a Message into an OpaqueMessage.
    *
-   * The current implementation does a simple copy from the internal buffer,
-   * data, to \p out.
-   *
-   * @param out the buffer to write out to.
-   * @param len maximum length, in bytes, of \p out.
+   * @param out reference parameter to output
    * @return non-zero on failure.
    */
-  int Message::serialize(unsigned char *const out, std::size_t len) const
+  int Message::serialize(OpaqueMessage &out) const
   {
-    //check out is large enough
-    if(len < size)
+    if(data.size() != dataSize)
     {
+      //data grew too large
       return -1;
     }
 
-    //copy data member variable to out
-    for(std::size_t i = 0; (i < len); ++i)
+    out.data.fill(0);
+    //copy fields packed into output
+    unsigned char *const o = out.data.data();
+
+    ::memcpy(&o[out.filled], senderId.data(), senderId.size());
+    out.filled += senderId.size();
+
+    ::memcpy(&o[out.filled], keyId.data(), keyId.size());
+    out.filled += keyId.size();
+
+    if((out.data.size() - out.filled) < OpaqueEphemeralKey::len)
     {
-      out[i] = data[i];
+      //ran out of space for ephemeral key somehow
+      return -2;
     }
+    //serialize EphemeralKey directly to char *
+    out.filled += senderKey.serialize(&o[out.filled]);
+
+    ::memcpy(&o[out.filled], nonce.data(), nonce.size());
+    out.filled += nonce.size();
+
+    ::memcpy(&o[out.filled], data.data(), data.size());
+    out.filled += data.size();
+
+    return out.filled == out.data.size();
+  }
+
+  /**
+   * @brief given the Receiver's ephemeral key, encrypt this Message in place
+   *
+   * @warning the signature on \p receiverKey is not verified in encrypt()
+   *
+   * @param receiverKey verified public Ephemeral key to encrypt under.
+   * @return non-zero on failure.
+   */
+  int Message::encrypt(EphemeralKey &receiverKey)
+  {
+    //copy out keyId = Receiver's ephemeral public key
+    std::vector<byte> receiverRawKey = receiverKey.key->public_value();
+    ::memcpy(keyId.data(), receiverRawKey.data(), keyId.size());
+
+    //derive a shared secret
+    secure_vector<byte> ss =
+      dynamic_cast<Curve25519_PrivateKey *>(senderKey.key.get())->agree(
+        receiverRawKey.data(),
+        receiverRawKey.size());
+
+    //run kdf, [ieee1363a-2004 kdf2(sha256)] on shared secret
+    secure_vector<byte> rawKey(32);
+    SHA_256 hash;
+    KDF2 kdf(&hash);
+
+    if(kdf.kdf(rawKey.data(), rawKey.size(), ss.data(), ss.size(), salt,
+        sizeof(salt)) != 32u)
+    {
+      //not enough bytes were generated
+      return -2;
+    }
+
+    //use rawKey as a symmetric key and encrypt plaintext
+    ChaCha20Poly1305_Encryption enc;
+    enc.set_key(rawKey);
+    enc.set_associated_data(keyId.data(), keyId.size()); //authenticate keyId
+    enc.start(nonce.data(), nonce.size());
+
+    //encrypt all at once
+    enc.finish(data, 0);
 
     return 0;
   }
 
   /**
-   * @brief deserialize a Message with a fragment of data in \p data.
+   * @brief deserialize an OpaqueMessage into a useable Message
    *
-   * @warning This is not thread safe.
-   *
-   * @param data next piece of data to deserialize.
-   * @param len length, in bytes, of \p data.
-   *
-   * @return 0 when fully deserialized, -1 on error, posotive when
-   *   incomplete.
+   * @param in serialized OpaqueMessage to deserialize
+   * @return non-zero on failure
    */
-  int Message::deserialize(unsigned char const *const data, std::size_t len)
+  int Message::deserialize(OpaqueMessage const &in)
   {
-    //copy given payload into message
-    for(std::size_t i = 0; (i < len) && ((filled) < this->data.size()); ++i)
-    {
-      this->data[filled] = data[i];
-      ++filled;
-    }
+    //unpack the fields
+    ::memcpy(senderId.data(), in.data.data(), senderId.size());
+    ::memcpy(data.data(), senderId.size() + in.data.data(), data.size());
 
-    return filled < this->data.size();
+    return 0;
   }
 }

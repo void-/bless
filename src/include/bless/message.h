@@ -64,7 +64,6 @@ namespace Bless
 
       std::array<unsigned char, 64> sig;
   };
-  const std::string EphemeralKey::emsa = "EMSA1(SHA-256)";
 
   /**
    * @class OpaqueMessage
