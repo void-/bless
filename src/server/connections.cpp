@@ -1267,6 +1267,7 @@ fail:
         //give the data to the server
         try
         {
+          //calls SenderChannel::recvData() via callback
           server->received_data(readBuffer, len);
         }
         catch(std::runtime_error &e)
