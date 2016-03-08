@@ -26,8 +26,9 @@ namespace Bless
       unsigned char *getSig() const;
 
       static const std::size_t keySize = 32;
-      static const std::size_t sigSize = 32;
-      std::array<unsigned char, keySize+sigSize> data;
+      static const std::size_t sigSize = 64;
+      static const constexpr std::size_t len = keySize + sigSize;
+      std::array<unsigned char, len> data;
   };
 
   /**
@@ -38,15 +39,32 @@ namespace Bless
   {
     public:
       EphemeralKey() = default;
+      ~EphemeralKey();
       int init(OpaqueEphemeralKey const &serialized,
         Botan::Public_Key const &verify);
+      int init(Botan::Private_Key &sigKey, Botan::RandomNumberGenerator &rng);
+
+      int serialize(OpaqueEphemeralKey &out) const;
+      size_t serialize(unsigned char *out) const;
 
       static const std::string emsa;
 
+      /**
+       * An Ephemeral key is either just a public key or a public+private key
+       * pair.
+       *
+       * Private key is already a subclass of public, so there's no use in
+       * having both public and private fields coexist; just polymorph.
+       *
+       * Only if an EphemeralKey was generated in the application should priv
+       * ever be used. If the key was deserialized, then only pub should be
+       * used.
+       */
       std::unique_ptr<Botan::Curve25519_PublicKey> key;
-      std::array<unsigned char, 32> sig;
+
+      std::array<unsigned char, 64> sig;
   };
-  const std::string EphemeralKey::emsa = "EMSA3(SHA-256)";
+  const std::string EphemeralKey::emsa = "EMSA1(SHA-256)";
 
   /**
    * @class OpaqueMessage
@@ -75,8 +93,8 @@ namespace Bless
   {
     int deserialize(unsigned char const *const data_, std::size_t len);
 
-    static const std::size_t size = 512;
-    std::array<unsigned char, size> data;
+    static const std::size_t len = 512;
+    std::array<unsigned char, len> data;
     std::size_t filled = 0;
   };
 
@@ -84,25 +102,45 @@ namespace Bless
    * @class Message
    * @brief represents an encrypted message between the Sender and Receiver.
    *
+   * Format:
+   *   senderId == hash of sender's certificate
+   *   keyId == hash of Receiver ephemeral key used
+   *   Sender's ephemeral key (signed)
+   *   data encrypted under secret derived from Sender, Receiver keys
+   *
    * @var size_t Message::filled
    * @brief number of bytes filled in when deserializing.
    */
   class Message
   {
     public:
-      Message();
+      Message() = default;
       ~Message();
-      Message(std::string const &data);
-      Message(std::istream &in);
 
-      int serialize(unsigned char *const out, std::size_t len) const;
-      int deserialize(unsigned char const *const data, std::size_t len);
+      int init(std::istream &in, Botan::Private_Key &sigKey,
+        Botan::X509_Certificate &senderCert,
+        Botan::RandomNumberGenerator &rng);
 
-      static const std::size_t size = 512;
-      std::array<unsigned char, size> data;
+      int serialize(OpaqueMessage &out) const;
+      int deserialize(OpaqueMessage const &in);
 
-    protected:
-      std::size_t filled;
+      int encrypt(EphemeralKey &receiverKey);
+
+      std::array<unsigned char, 32> senderId;
+      std::array<unsigned char, 32> keyId;
+      EphemeralKey senderKey;
+      std::array<unsigned char, 12> nonce;
+      static const size_t dataSize = 256;
+      Botan::secure_vector<Botan::byte> data;
+
+      static_assert(
+        (sizeof(senderId) + sizeof(keyId) + sizeof(senderKey) + sizeof(nonce) +
+          dataSize) <= OpaqueMessage::len,
+        "Not enough space to serialize Message into OpaqueMessage.");
+
+      static const constexpr unsigned char salt[] = {
+        0x62, 0x6c, 0x65, 0x73, 0x73, 0x20, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+        0x65};
   };
 }
 
