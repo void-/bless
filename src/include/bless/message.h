@@ -132,12 +132,17 @@ namespace Bless
       std::array<unsigned char, 32> keyId;
       EphemeralKey senderKey;
       std::array<unsigned char, 12> nonce;
-      static const size_t dataSize = 256;
+      static const size_t dataSize = 324;
+      static const size_t tagSize = 16;
       Botan::secure_vector<Botan::byte> data;
 
       static_assert(
-        (sizeof(senderId) + sizeof(keyId) + sizeof(senderKey) + sizeof(nonce) +
-          dataSize) <= OpaqueMessage::len,
+        (sizeof(senderId) +
+         sizeof(keyId) +
+         OpaqueEphemeralKey::len +
+         sizeof(nonce) +
+         dataSize +
+         tagSize) == OpaqueMessage::len,
         "Not enough space to serialize Message into OpaqueMessage.");
 
       static const unsigned char salt[];

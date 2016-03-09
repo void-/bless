@@ -101,7 +101,7 @@ namespace Bless
    */
   unsigned char *OpaqueEphemeralKey::getSig() const
   {
-    return const_cast<unsigned char *>(sigSize + data.data());
+    return const_cast<unsigned char *>(keySize + data.data());
   }
 
   /**
@@ -133,15 +133,24 @@ namespace Bless
     }
 
     //convert std::array into secure_vector to construct key
-    secure_vector<byte> keyBytes;
+    secure_vector<byte> keyBytes(OpaqueEphemeralKey::keySize);
     if(buffer_insert(keyBytes, 0, serialized.getKey(),
-        OpaqueEphemeralKey::keySize) != 0)
+        OpaqueEphemeralKey::keySize) == 0)
     {
       return -2;
     }
 
+    //buffer_insert failed
+    if(keyBytes.size() != OpaqueEphemeralKey::keySize)
+    {
+      return -3;
+    }
+
     key = std::unique_ptr<Curve25519_PublicKey>(
       new Curve25519_PublicKey(keyBytes));
+
+    //copy in signature
+    ::memcpy(sig.data(), serialized.getSig(), sig.size());
 
     return 0;
   }
@@ -262,9 +271,10 @@ namespace Bless
     //fill nonce
     rng.randomize(nonce.data(), nonce.size());
 
-    //read bytes from the user
+    //allocate enough space for user data; tag space will be auto allocated
     data.resize(dataSize);
-    in.read((char *)(data.data()), data.size());
+    //read bytes from the user
+    in.read((char *)(data.data()), dataSize);
     return in.good();
   }
 
@@ -276,7 +286,8 @@ namespace Bless
    */
   int Message::serialize(OpaqueMessage &out) const
   {
-    if(data.size() != dataSize)
+    //encrypt always grows data by tagSize bytes
+    if(data.size() != (dataSize+tagSize))
     {
       //data grew too large
       return -1;
@@ -303,10 +314,11 @@ namespace Bless
     ::memcpy(&o[out.filled], nonce.data(), nonce.size());
     out.filled += nonce.size();
 
-    ::memcpy(&o[out.filled], data.data(), data.size());
+    //write message data and tag (both stored in `data')
+    ::memcpy(&o[out.filled], data.data(), dataSize+tagSize);
     out.filled += data.size();
 
-    return out.filled == out.data.size();
+    return out.filled != out.data.size();
   }
 
   /**
@@ -321,6 +333,12 @@ namespace Bless
   {
     //copy out keyId = Receiver's ephemeral public key
     std::vector<byte> receiverRawKey = receiverKey.key->public_value();
+
+    if(receiverRawKey.size() != keyId.size())
+    {
+      //public key is wrong size
+      return -1;
+    }
     ::memcpy(keyId.data(), receiverRawKey.data(), keyId.size());
 
     //derive a shared secret
@@ -331,8 +349,9 @@ namespace Bless
 
     //run kdf, [ieee1363a-2004 kdf2(sha256)] on shared secret
     secure_vector<byte> rawKey(32);
-    SHA_256 hash;
-    KDF2 kdf(&hash);
+
+    //NOTE: KDF2() puts a hash * into a unique_ptr (why?!?)
+    KDF2 kdf(new SHA_256());
 
     if(kdf.kdf(rawKey.data(), rawKey.size(), ss.data(), ss.size(), salt,
         sizeof(salt)) != 32u)
