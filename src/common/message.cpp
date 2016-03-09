@@ -256,7 +256,17 @@ namespace Bless
   {
     //senderId = sha256 of Sender's certificate
     std::string certId = senderCert.fingerprint("SHA-256");
-    if(hex_decode(senderId.data(), certId, false) != senderId.size())
+
+    //iterate through string and replace `:' with ` ' to satisfy hex_decode
+    for(auto &c : certId)
+    {
+      if(c == ':')
+      {
+        c = ' ';
+      }
+    }
+
+    if(hex_decode(senderId.data(), certId, true) != senderId.size())
     {
       //wrote out an unexpected number of bytes
       return -5;
