@@ -8,7 +8,7 @@
 
 #include "auth.h"
 
-#include <functional>
+#include <botan/pubkey.h>
 #include <botan/tls_client.h>
 #include <botan/tls_session_manager.h>
 #include <botan/credentials_manager.h>
@@ -81,6 +81,7 @@ namespace Bless
       int init(AuthKeys *keys, const std::string &server,
         unsigned short port, Botan::RandomNumberGenerator *rng_);
       int connect();
+      int recvKey(EphemeralKey &out, Botan::Public_Key const &verify);
       int sendMessage(Message const &message);
 
     protected:
@@ -98,6 +99,8 @@ namespace Bless
       static const size_t bufferSize = 4096;
       static const int handshakeTimeout = 1 * 1000;
       static const int channelTimeout = 120 * 1000;
+
+      OpaqueEphemeralKey tempKey;
 
     private:
       AuthKeys *authKeys;

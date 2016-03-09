@@ -367,14 +367,85 @@ fail:
   }
 
   /**
+   * @brief read an EphemeralKey from the Server
+   *
+   * Read an OpaqueEphemeralKey, deserialize and verify it.
+   *
+   * @param out unitialized output parameter.
+   * @param verify public key used to verify the received ephemeral key
+   * @return non-zero on failure.
+   */
+  int Channel::recvKey(EphemeralKey &out, Botan::Public_Key const &verify)
+  {
+    ::pollfd pollSocket;
+    unsigned char readBuffer[bufferSize];
+
+    //set up socket for polling
+    pollSocket.fd = connection;
+    pollSocket.events = POLLIN; //poll for reading
+
+    //read bytes off the socket while tempKey isn't fully deserialized
+    while(client->is_active() && tempKey.deserialize(nullptr, 0))
+    {
+      //not ready after 3 seconds
+      if(::poll(&pollSocket, 3u, handshakeTimeout) != 1)
+      {
+        return -2;
+      }
+
+      //error on socket
+      if((pollSocket.revents & POLLERR) | (pollSocket.revents & POLLHUP) |
+          (pollSocket.revents & POLLNVAL))
+      {
+        //could have received ICMP unreachable
+        return pollSocket.revents;
+      }
+
+      //must be ready to read
+      ssize_t count = read(connection, readBuffer, sizeof(readBuffer));
+
+      if(count <= 0)
+      {
+        //poll() lied!
+        return -3;
+      }
+
+      //give read data to client
+      client->received_data(readBuffer, count);
+    }
+
+    //still expecting bytes but loop ended
+    if(tempKey.deserialize(nullptr, 0))
+    {
+      return -4;
+    }
+
+    //init out with fully deserialized tempKey and verify signature
+    if(out.init(tempKey, verify))
+    {
+      return -5;
+    }
+
+    return 0;
+  }
+
+  /**
    * @brief send a message to the Server.
    *
+   * @param message Message to serialize and write on the wire.
    * @return non-zero on failure.
    */
   int Channel::sendMessage(Message const &message)
   {
+    //serialize the input message to opaque form
+    OpaqueMessage m;
+    if(int error = message.serialize(m))
+    {
+      return error;
+    }
+
     //connection established, write message
-    client->send(message.data.data(), message.data.size());
+    client->send(m.data.data(), m.data.size());
 
     return 0;
   }
@@ -401,16 +472,15 @@ fail:
   /**
    * @brief callback when the Server sends data to the Sender.
    *
-   * This is a no op, because currently, the Server never writes back to the
-   * sender.
+   * This is fills up tempKey that can then be retreived via recvKey().
    *
-   * @param payload not used.
-   * @param len not used.
+   * @param payload decrypted bytes off the wire.
+   * @param len length, in bytes, of \p payload.
    */
-  void Channel::recvData(const byte *const, size_t)
+  void Channel::recvData(const byte *const payload, size_t len)
   {
+    tempKey.deserialize(payload, len);
   }
-
 
   /**
    * @brief callback when the TLS connection receives an encryption alert.
