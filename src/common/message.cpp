@@ -13,30 +13,12 @@ using namespace Botan;
 namespace Bless
 {
   const std::string EphemeralKey::emsa = "EMSA1(SHA-256)";
+  const unsigned char Message::salt[] = {
+    0x62, 0x6c, 0x65, 0x73, 0x73, 0x20, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
+    0x65};
 
-  /**
-   * @brief deserialize a message with a fragment of data in \p data.
-   *
-   * @warning This is not thread safe.
-   *
-   * If \p len is longer than the remaining number of bytes needed to
-   * deserialize the message, this is not an error.
-   *
-   * @param data next piece of data to deserialize.
-   * @param len length, in bytes, of \p data.
-   * @return 0 when fully deserialized, non-zero when incomplete.
-   */
-  int OpaqueMessage::deserialize(unsigned char const *const data_,
-      std::size_t len)
+  OpaqueEphemeralKey::OpaqueEphemeralKey() : filled(0)
   {
-    //copy given payload into message
-    for(std::size_t i = 0; (i < len) && ((filled) < data.size()); ++i)
-    {
-      data[filled] = data_[i];
-      ++filled;
-    }
-
-    return filled < data.size();
   }
 
   /**
@@ -75,6 +57,31 @@ namespace Bless
 
     //return 0 if all bytes were read
     return f.eof();
+  }
+
+  /**
+   * @brief deserialize an ephemeral key with a fragment of data in \p data.
+   *
+   * @warning This is not thread safe.
+   *
+   * If \p len is longer than the remaining number of bytes needed to
+   * deserialize the message, this is not an error.
+   *
+   * @param data next piece of data to deserialize.
+   * @param len length, in bytes, of \p data.
+   * @return 0 when fully deserialized, non-zero when incomplete.
+   */
+  int OpaqueEphemeralKey::deserialize(unsigned char const *const data_,
+      std::size_t len)
+  {
+    //copy given payload into message
+    for(std::size_t i = 0; (i < len) && ((filled) < data.size()); ++i)
+    {
+      data[filled] = data_[i];
+      ++filled;
+    }
+
+    return filled < data.size();
   }
 
   /**
@@ -186,6 +193,31 @@ namespace Bless
   }
 
   /**
+   * @brief deserialize a message with a fragment of data in \p data.
+   *
+   * @warning This is not thread safe.
+   *
+   * If \p len is longer than the remaining number of bytes needed to
+   * deserialize the message, this is not an error.
+   *
+   * @param data next piece of data to deserialize.
+   * @param len length, in bytes, of \p data.
+   * @return 0 when fully deserialized, non-zero when incomplete.
+   */
+  int OpaqueMessage::deserialize(unsigned char const *const data_,
+      std::size_t len)
+  {
+    //copy given payload into message
+    for(std::size_t i = 0; (i < len) && ((filled) < data.size()); ++i)
+    {
+      data[filled] = data_[i];
+      ++filled;
+    }
+
+    return filled < data.size();
+  }
+
+  /**
    * @brief destruct a Message, zeroing the data.
    */
   Message::~Message()
@@ -211,7 +243,7 @@ namespace Bless
    * @return non-zero on failure
    */
   int Message::init(std::istream &in, Private_Key &sigKey,
-      X509_Certificate &senderCert, RandomNumberGenerator &rng)
+      X509_Certificate const &senderCert, RandomNumberGenerator &rng)
   {
     //senderId = sha256 of Sender's certificate
     std::string certId = senderCert.fingerprint("SHA-256");

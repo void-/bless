@@ -18,9 +18,9 @@ namespace Bless
   class OpaqueEphemeralKey
   {
     public:
-      OpaqueEphemeralKey() = default;
+      OpaqueEphemeralKey();
       int deserialize(std::string const &file);
-      int deserialize(unsigned char const *const data, std::size_t len);
+      int deserialize(unsigned char const *const data_, std::size_t len);
 
       unsigned char *getKey() const;
       unsigned char *getSig() const;
@@ -29,6 +29,9 @@ namespace Bless
       static const std::size_t sigSize = 64;
       static const constexpr std::size_t len = keySize + sigSize;
       std::array<unsigned char, len> data;
+
+    private:
+      std::size_t filled;
   };
 
   /**
@@ -117,7 +120,7 @@ namespace Bless
       ~Message();
 
       int init(std::istream &in, Botan::Private_Key &sigKey,
-        Botan::X509_Certificate &senderCert,
+        Botan::X509_Certificate const &senderCert,
         Botan::RandomNumberGenerator &rng);
 
       int serialize(OpaqueMessage &out) const;
@@ -137,9 +140,7 @@ namespace Bless
           dataSize) <= OpaqueMessage::len,
         "Not enough space to serialize Message into OpaqueMessage.");
 
-      static const constexpr unsigned char salt[] = {
-        0x62, 0x6c, 0x65, 0x73, 0x73, 0x20, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67,
-        0x65};
+      static const unsigned char salt[];
   };
 }
 
