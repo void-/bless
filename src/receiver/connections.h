@@ -118,7 +118,7 @@ namespace Bless
       bool handshake(const Botan::TLS::Session &session);
 
       static const size_t bufferSize = 16416;
-      static_assert(bufferSize > (OpaqueMessage::size + 24u),
+      static_assert(bufferSize > (OpaqueMessage::len + 24u),
         "Buffer too small for OpaqueMessage size.");
       static const int handshakeTimeout = 1 * 1000;
       static const int channelTimeout = 120 * 1000;
