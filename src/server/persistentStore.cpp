@@ -63,7 +63,7 @@ namespace Bless
     {
       try
       {
-        stagedIn.emplace_back(std::string(entry->d_name));
+        stagedIn.emplace_back(std::string(path_ + "/" + entry->d_name));
         auto cert = stagedIn.back();
 
         //verify cert is self-signed and valid
@@ -165,7 +165,7 @@ fail:
     {
       //unique_ptr ensures k is never leaked; release when passing to queue/map
       std::unique_ptr<OpaqueEphemeralKey> k(new OpaqueEphemeralKey());
-      std::string name(entry->d_name);
+      std::string name(path + "/" + entry->d_name);
       OpaqueEphemeralKey *rawK;
 
       //deserialization failed, try the next file
