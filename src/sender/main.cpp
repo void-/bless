@@ -173,7 +173,8 @@ int main(int argc, char **argv)
   Channel chan;
   Botan::AutoSeeded_RNG rng;
   std::string message;
-  Message m;
+  EphemeralKey receiverKey;
+  Message msg;
 
   //parse the arguments
   if((error = args.init(argc, argv)))
@@ -199,7 +200,13 @@ int main(int argc, char **argv)
   }
 
   //get a message from the user
-  m = Message(std::cin);
+  if((error = msg.init(std::cin, *authKeys.getSenderReceiverKey(),
+      *authKeys.getSenderReceiverCert(), rng)))
+  {
+    std::cerr << "Failed to read message data or generate Sender key" <<
+      std::endl;
+    goto fail;
+  }
 
   //connect to the Server
   if((error = chan.connect()))
@@ -208,8 +215,24 @@ int main(int argc, char **argv)
     goto fail;
   }
 
-  //send a message to Server
-  if((error = chan.sendMessage(m)))
+  //receive an ephemeral key from the Server on behalf of the Receiver
+  if((error =
+      chan.recvKey(receiverKey,
+        *authKeys.getReceiverCert()->subject_public_key())))
+  {
+    std::cerr << "Failed to receive or verify ephemeral key" << std::endl;
+    goto fail;
+  }
+
+  //encrypt message in place with received Sender key
+  if((error = msg.encrypt(receiverKey)))
+  {
+    std::cerr << "Failed to encrypt under ephemeral key" << std::endl;
+    goto fail;
+  }
+
+  //send the message to Server
+  if((error = chan.sendMessage(msg)))
   {
     std::cerr << "Failed to send message" << std::endl;
     goto fail;
