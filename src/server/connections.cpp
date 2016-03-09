@@ -1296,12 +1296,19 @@ shutdown:
         //error occurred, only release() the key
         if(error)
         {
-          keys->release(key);
+          if(keys->release(key))
+          {
+            //the key store doesn't know about this key == a bug
+            return -10;
+          }
         }
         else
         {
           //no error, the key was used successfully
-          keys->free(key);
+          if(keys->free(key))
+          {
+            return -11;
+          }
         }
       }
 
