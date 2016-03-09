@@ -362,7 +362,7 @@ fail:
 
     //seek, write, flush; saving the returned stream
     backend.seekp(0, std::ios_base::end)
-      .write(reinterpret_cast<char *>(msg.data.data()), OpaqueMessage::size)
+      .write(reinterpret_cast<char *>(msg.data.data()), OpaqueMessage::len)
       .flush();
 
     //return 1 if the stream errored
