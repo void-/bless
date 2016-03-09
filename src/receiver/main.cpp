@@ -57,10 +57,14 @@ struct ListenArgs
   std::string receiverKeyFile;
   std::string receiverCertFile;
   std::string serverCertFile;
+  std::string senderCertsPath;
+  std::string ephemeralKeysPath;
   unsigned short port;
 
   static const std::string defaultReceiverCertFile;
   static const std::string defaultServerCertFile;
+  static const std::string defaultSenderCerts;
+  static const std::string defaultEphemeralKeys;
   static const unsigned short defaultPort = 9549;
 };
 
@@ -68,6 +72,8 @@ const std::string ListenArgs::defaultReceiverCertFile =
   RESOURCE_PATH"receiverCert.pem";
 const std::string ListenArgs::defaultServerCertFile =
   RESOURCE_PATH"serverCert.pem";
+const std::string ListenArgs::defaultSenderCerts = RESOURCE_PATH;
+const std::string ListenArgs::defaultEphemeralKeys = RESOURCE_PATH"/keys/";
 
 /**
  * @brief parse the arguments passed into main().
@@ -91,7 +97,7 @@ int ListenArgs::init(int argc, char **argv)
     return -1;
   }
 
-  if(argc > 5)
+  if(argc > 7)
   {
     //too many arguments
     return -2;
@@ -104,6 +110,8 @@ int ListenArgs::init(int argc, char **argv)
   //check for optional argument
   receiverCertFile = defaultReceiverCertFile;
   serverCertFile = defaultServerCertFile;
+  senderCertsPath = defaultSenderCerts;
+  ephemeralKeysPath = defaultEphemeralKeys;
 
   //no parsing for port yet
   port = defaultPort;
@@ -118,7 +126,7 @@ void ListenArgs::usage() const
 {
   std::cerr <<
     "usage: ./binary serverAddress receiverPrivateKey [receiverCertificate] "
-    "[serverCertificate] [port]" <<
+    "[serverCertificate] [senderCertificatesPath] [ephemeralKeys] [port]" <<
     std::endl;
 }
 
