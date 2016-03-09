@@ -57,7 +57,10 @@ namespace Bless
         Botan::RandomNumberGenerator &rng);
 
       Botan::X509_Certificate const *getSenderCert() const;
+      Botan::X509_Certificate const *getSenderReceiverCert() const;
+      Botan::X509_Certificate const *getReceiverCert() const;
       Botan::X509_Certificate const *getServerCert() const;
+      Botan::Private_Key *getSenderReceiverKey() const;
       Botan::Private_Key *getSenderPrivKey() const;
 
     private:

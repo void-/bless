@@ -231,6 +231,28 @@ namespace Bless
   }
 
   /**
+   * @brief return a pointer to the Sender's certificate the Receiver uses to
+   * verify message signatures.
+   *
+   * @return senderReceiverCert.
+   */
+  Botan::X509_Certificate const *AuthKeys::getSenderReceiverCert() const
+  {
+    return senderReceiverCert;
+  }
+
+  /**
+   * @brief return a pointer to the Receiver's certificate for signature
+   * verification.
+   *
+   * @return senderReceiverCert
+   */
+  Botan::X509_Certificate const *AuthKeys::getReceiverCert() const
+  {
+    return receiverCert;
+  }
+
+  /**
    * @brief return a pointer to the Server's certificate.
    *
    * @return serverCert.
@@ -241,11 +263,22 @@ namespace Bless
   }
 
   /**
+   * @brief return a pointer to the Server's private key for signing
+   *   Receiver-bound messages.
+   *
+   * @return senderReceiverKey, the private half of getSenderReceiverCert().
+   */
+  Botan::Private_Key *AuthKeys::getSenderPrivKey() const
+  {
+    return senderReceiverKey;
+  }
+
+  /**
    * @brief return a pointer to the Server's private key for TLS.
    *
    * @return senderServerKey, the private half of getServerCert().
    */
-  Botan::Private_Key *AuthKeys::getSenderPrivKey() const
+  Botan::Private_Key *AuthKeys::getSenderReceiverKey() const
   {
     return senderServerKey;
   }
