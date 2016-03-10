@@ -178,7 +178,7 @@ int main(int argc, char **argv)
   }
 
   //load Receiver ephemeral key store
-  if((error = senderCerts.init(args.defaultEphemeralKeys)))
+  if((error = ephemeralKeys.init(args.defaultEphemeralKeys, rng)))
   {
     std::cerr << "Failed to load ephemeral key store" << std::endl;
     goto fail;
