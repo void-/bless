@@ -233,6 +233,11 @@ namespace Bless
     return OpaqueEphemeralKey::len;
   }
 
+  OpaqueMessage::OpaqueMessage()
+  {
+    data.fill(0);
+  }
+
   /**
    * @brief deserialize a message with a fragment of data in \p data.
    *

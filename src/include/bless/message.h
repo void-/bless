@@ -97,6 +97,7 @@ namespace Bless
    */
   struct OpaqueMessage
   {
+    OpaqueMessage();
     int deserialize(unsigned char const *const data_, std::size_t len);
 
     static const std::size_t len = 512;
