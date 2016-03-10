@@ -1,6 +1,7 @@
 #include <bless/message.h>
 
 #include <botan/pubkey.h>
+#include <botan/pkcs8.h>
 #include <botan/hex.h>
 #include <botan/sha2_32.h>
 #include <botan/kdf2.h>
@@ -156,32 +157,32 @@ namespace Bless
   }
 
   /**
-   * @brief deserialize a OpaqueEphemeralKey containing a private key.
+   * @brief deserialize a private EphemeralKey from a file
    *
-   * @param serializedPrivate the key to deserialize into this.
+   * @param file filepath to load from
+   * @param rng needed for verifying file
    * @return non-zero on failure
    */
-  int EphemeralKey::init(OpaqueEphemeralKey const &serializedPrivate)
+  int EphemeralKey::deserialize(std::string const &file,
+      RandomNumberGenerator &rng)
   {
-    //convert std::array into secure_vector to construct key
-    secure_vector<byte> keyBytes(OpaqueEphemeralKey::keySize);
-    if(buffer_insert(keyBytes, 0, serializedPrivate.getKey(),
-        OpaqueEphemeralKey::keySize) == 0)
+    try
+    {
+      key.reset(dynamic_cast<Curve25519_PrivateKey *>(
+        PKCS8::load_key(file, rng)));
+    }
+    catch(Stream_IO_Error &e)
     {
       return -2;
     }
-
-    //buffer_insert failed
-    if(keyBytes.size() != OpaqueEphemeralKey::keySize)
+    catch(PKCS8_Exception &e)
     {
       return -3;
     }
-
-    key = std::unique_ptr<Curve25519_PublicKey>(
-      new Curve25519_PrivateKey(keyBytes));
-
-    //copy in signature
-    ::memcpy(sig.data(), serializedPrivate.getSig(), sig.size());
+    catch(Decoding_Error &e)
+    {
+      return -5;
+    }
 
     return 0;
   }

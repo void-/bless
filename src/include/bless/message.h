@@ -45,12 +45,14 @@ namespace Bless
       ~EphemeralKey();
       int init(OpaqueEphemeralKey const &serialized,
         Botan::Public_Key const &verify);
-      int init(OpaqueEphemeralKey const &serializedPrivate);
       int init(Botan::Private_Key &sigKey, Botan::RandomNumberGenerator &rng);
 
       int serialize(OpaqueEphemeralKey &out) const;
 
       size_t serialize(unsigned char *out) const;
+
+      int deserialize(std::string const &file,
+        Botan::RandomNumberGenerator &rng);
 
       static const std::string emsa;
 
