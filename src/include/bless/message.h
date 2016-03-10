@@ -44,12 +44,15 @@ namespace Bless
       EphemeralKey() = default;
       ~EphemeralKey();
       int init(OpaqueEphemeralKey const &serialized,
-        Botan::Public_Key const &verify);
+        Botan::Public_Key const &signerKey);
       int init(Botan::Private_Key &sigKey, Botan::RandomNumberGenerator &rng);
+
+      int verify(Botan::Public_Key const &sigKey);
 
       int serialize(OpaqueEphemeralKey &out) const;
 
       size_t serialize(unsigned char *out) const;
+      size_t deserialize(unsigned char const *const in);
 
       int deserialize(std::string const &file,
         Botan::RandomNumberGenerator &rng);
@@ -132,6 +135,8 @@ namespace Bless
       int deserialize(OpaqueMessage const &in);
 
       int encrypt(EphemeralKey &receiverKey);
+      int decrypt(Botan::X509_Certificate *senderCert,
+        EphemeralKey *receiverKey);
 
       std::array<unsigned char, 32> senderId;
       std::array<unsigned char, 32> keyId;

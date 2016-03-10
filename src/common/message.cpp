@@ -117,21 +117,14 @@ namespace Bless
    * @brief deserialize an OpaqueEphemeralKey and verify its signature.
    *
    * @param serialized the key to deserialize into this.
-   * @param verify public signing key presumably used to sign this key.
+   * @param signerKey public signing key presumably used to sign this key.
    * @return non-zero on failure
    */
   int EphemeralKey::init(OpaqueEphemeralKey const &serialized,
-      Public_Key const &verify)
+      Public_Key const &signerKey)
   {
-    //construct a signature verifier from given public key
-    PK_Verifier v(verify, emsa);
-
-    //check the signature in the key
-    if(!v.verify_message(serialized.getKey(), OpaqueEphemeralKey::keySize,
-          serialized.getSig(), OpaqueEphemeralKey::sigSize))
-    {
-      return -1;
-    }
+    //copy in signature
+    ::memcpy(sig.data(), serialized.getSig(), sig.size());
 
     //convert std::array into secure_vector to construct key
     secure_vector<byte> keyBytes(OpaqueEphemeralKey::keySize);
@@ -150,8 +143,38 @@ namespace Bless
     key = std::unique_ptr<Curve25519_PublicKey>(
       new Curve25519_PublicKey(keyBytes));
 
-    //copy in signature
-    ::memcpy(sig.data(), serialized.getSig(), sig.size());
+    //verify signature
+    if(verify(signerKey))
+    {
+      return -4;
+    }
+
+    return 0;
+  }
+
+  /**
+   * @brief just verify the signature in the key
+   *
+   * @param sigKey public key(ecdsa) used to sign this key(curve25519).
+   * @return non-zero on failure.
+   */
+  int EphemeralKey::verify(Public_Key const &sigKey)
+  {
+    //construct a signature verifier from given public key
+    PK_Verifier v(sigKey, emsa);
+
+    auto rawPub = key->public_value();
+
+    if(rawPub.size() != OpaqueEphemeralKey::keySize)
+    {
+      return -2;
+    }
+
+    //check the signature in the key
+    if(!v.verify_message(rawPub.data(), rawPub.size(), sig.data(), sig.size()))
+    {
+      return -1;
+    }
 
     return 0;
   }
@@ -229,6 +252,26 @@ namespace Bless
     copy_mem(out, keyBytes.data(), OpaqueEphemeralKey::keySize);
     copy_mem(&out[OpaqueEphemeralKey::keySize], sig.data(),
       OpaqueEphemeralKey::sigSize);
+
+    return OpaqueEphemeralKey::len;
+  }
+
+  /**
+   * @brief deserialize an EphemeralKey directly from a buffer of length
+   *   OpaqueEphemeralKey::len
+   *
+   * @param out buffer to read in from, OpaqueEphemeralKey::len bytes long
+   * @return number of bytes read
+   */
+  size_t EphemeralKey::deserialize(unsigned char const *const in)
+  {
+    //read in and deserialize public key
+    secure_vector<byte> keyBytes(OpaqueEphemeralKey::keySize);
+    ::memcpy(keyBytes.data(), in, OpaqueEphemeralKey::keySize);
+    key.reset(new Curve25519_PublicKey(keyBytes));
+
+    //read in signature
+    ::memcpy(sig.data(), in+OpaqueEphemeralKey::keySize, OpaqueEphemeralKey::sigSize);
 
     return OpaqueEphemeralKey::len;
   }
@@ -318,8 +361,15 @@ namespace Bless
     //fill nonce
     rng.randomize(nonce.data(), nonce.size());
 
-    //allocate enough space for user data; tag space will be auto allocated
+    //allocate enough real space for user data and extra for tag
+    data.reserve(dataSize+tagSize);
     data.resize(dataSize);
+    fill(data.begin(), data.end(), 0);
+    if(data.size() != dataSize)
+    {
+      //resize failed
+      return -6;
+    }
     //read bytes from the user
     in.read((char *)(data.data()), dataSize);
     return in.good();
@@ -420,6 +470,57 @@ namespace Bless
   }
 
   /**
+   * @brief decrypt a message from the Sender
+   *
+   * - verify signature
+   * - rederive shared secret
+   *
+   * @param senderCert Sender's cert used to sign the message
+   * @param receiverKey Receiver's ephemeral key the Sender encrypted this
+   *   message under.
+   * @return non-zero on failure.
+   */
+  int Message::decrypt(Botan::X509_Certificate *senderCert,
+      EphemeralKey *receiverKey)
+  {
+    //verify signature
+    if(senderKey.verify(*senderCert->subject_public_key()))
+    {
+      return -1;
+    }
+
+    //derive a shared secret using (senderKey, receiverKey)
+    auto sendPub = senderKey.key->public_value();
+    secure_vector<byte> ss =
+      dynamic_cast<Curve25519_PrivateKey *>(receiverKey->key.get())->agree(
+        sendPub.data(), sendPub.size());
+
+    //run kdf, [ieee1363a-2004 kdf2(sha256)] on shared secret
+    secure_vector<byte> rawKey(32);
+
+    //NOTE: KDF2() puts a hash * into a unique_ptr (why?!?)
+    KDF2 kdf(new SHA_256());
+
+    if(kdf.kdf(rawKey.data(), rawKey.size(), ss.data(), ss.size(), salt,
+        sizeof(salt)) != 32u)
+    {
+      //not enough bytes were generated
+      return -2;
+    }
+
+    //use rawKey as a symmetric key and decrypt/verify ciphertext
+    ChaCha20Poly1305_Encryption enc;
+    enc.set_key(rawKey);
+    enc.set_associated_data(keyId.data(), keyId.size()); //authenticate keyId
+    enc.start(nonce.data(), nonce.size());
+
+    //decrypt all at once, inplace in data
+    enc.finish(data, 0);
+
+    return 0;
+  }
+
+  /**
    * @brief deserialize an OpaqueMessage into a useable Message
    *
    * @param in serialized OpaqueMessage to deserialize
@@ -428,8 +529,26 @@ namespace Bless
   int Message::deserialize(OpaqueMessage const &in)
   {
     //unpack the fields
-    ::memcpy(senderId.data(), in.data.data(), senderId.size());
-    ::memcpy(data.data(), senderId.size() + in.data.data(), data.size());
+    unsigned char *rawData = (unsigned char *)in.data.data();
+
+    //senderId
+    ::memcpy(senderId.data(), rawData, senderId.size());
+    rawData += senderId.size();
+
+    //keyId
+    ::memcpy(keyId.data(), rawData, keyId.size());
+    rawData += keyId.size();
+
+    //deserialize senderKey
+    rawData += senderKey.deserialize(rawData);
+
+    //nonce
+    ::memcpy(nonce.data(), rawData, nonce.size());
+    rawData += nonce.size();
+
+    //ciphertext + tag
+    data.resize(dataSize+tagSize);
+    ::memcpy(data.data(), rawData, dataSize+tagSize);
 
     return 0;
   }
