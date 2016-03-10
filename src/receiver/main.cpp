@@ -10,6 +10,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <functional>
 
 #include <botan/auto_rng.h>
 
@@ -21,8 +22,6 @@
 #endif //RESOURCE_PATH
 
 using namespace Bless;
-
-int getMessage(unsigned char const *const, std::size_t);
 
 /**
  * @struct ListenArgs
@@ -133,6 +132,103 @@ void ListenArgs::usage() const
 }
 
 /**
+ * @brief use certificates and ephemeral keys to deserialize and decrypt
+ * messages.
+ *
+ */
+class MessageReceiver
+{
+  public:
+    int init(KeyStore *certs_, EphemeralKeyStore *keys_);
+
+    int receiveMessage(OpaqueMessage &msg);
+
+  private:
+    KeyStore *certs;
+    EphemeralKeyStore *keys;
+};
+
+int MessageReceiver::init(KeyStore *certs_, EphemeralKeyStore *keys_)
+{
+  certs = certs_;
+  keys = keys_;
+
+  return 0;
+}
+
+/**
+ * @brief use as a callback
+ *
+ * - deserialize \p msg into Message
+ * - determine which certificate+keys to use
+ * - decrypt message
+ * - write to stdout
+ *
+ * @param msg opaque message off the wire
+ */
+int MessageReceiver::receiveMessage(OpaqueMessage &msg)
+{
+  int error = 0;
+  Message m;
+  Botan::X509_Certificate *cert;
+  EphemeralKey *key;
+
+  //deserialize opaque message
+  if(m.deserialize(msg))
+  {
+    error = -8;
+    goto fail;
+  }
+
+  //lookup Sender's certificate
+  if(!(cert = certs->getCert(m.senderId)))
+  {
+    //unknown Sender
+    error = -9;
+    goto fail;
+  }
+
+  //lookup Receiver ephemeral key used
+  if(!(key = keys->getKey(m.keyId)))
+  {
+    //key unknown or already deleted
+    error = -10;
+    goto fail;
+  }
+
+  //decrypt message
+  if((error = m.decrypt(cert, key)))
+  {
+    goto fail;
+  }
+
+  //data is in m.data, dataSize bytes long
+  for(std::size_t i = 0; i < Message::dataSize; ++i)
+  {
+    std::cerr << m.data[i];
+  }
+
+  //decryption successful, free ephemeral key
+  if(keys->free(key))
+  {
+    error = -12;
+  }
+
+fail:
+  std::cerr << "Message decryption failed, error: " << error << std::endl;
+  if(error && key)
+  {
+    //some error, reuse key later
+    if(keys->release(key))
+    {
+      //unknown key
+      error = -11;
+    }
+  }
+  return error;
+}
+
+/**
  * @brief setup and run the Receiver client.
  *
  * Steps:
@@ -155,6 +251,7 @@ int main(int argc, char **argv)
   Botan::AutoSeeded_RNG rng;
   FileSystemStore senderCerts;
   FileSystemEphemeralStore ephemeralKeys;
+  MessageReceiver recv;
 
   //parse the arguments
   if((error = args.init(argc, argv)))
@@ -185,15 +282,23 @@ int main(int argc, char **argv)
     goto fail;
   }
 
+  //initialize message receiver
+  if((error = recv.init(&senderCerts, &ephemeralKeys)))
+  {
+    std::cerr << "Filed to initialize message receiver" << std::endl;
+    goto fail;
+  }
+
   //initialize the channel, but don't connect it yet
-  if((error = chan.init(&authKeys, args.serverAddress, args.port)))
+  if((error = chan.init(&authKeys, args.serverAddress, args.port, std::bind(
+      &MessageReceiver::receiveMessage, &recv, std::placeholders::_1))))
   {
     std::cerr << "Failed to initialize channel" << std::endl;
     goto fail;
   }
 
   //establish the message channel: connect to the Server
-  if((error = chan.connect(rng, getMessage)))
+  if((error = chan.connect(rng)))
   {
     std::cerr << "Failed to connect" << std::endl;
     goto fail;
@@ -208,28 +313,4 @@ int main(int argc, char **argv)
 
 fail:
   return error;
-}
-
-/**
- * @brief callback when a new message is received from the Sender.
- *
- * This follows the interface for Channel::recvCallback.
- *
- * XXX: Is \p payload secure memory?
- *
- * @todo this is the raw data from the Sender; authenticate it
- *
- * @param payload message data from the Sender.
- * @param len the length, in bytes, of \p payload.
- * @return non-zero on error.
- */
-int getMessage(unsigned char const *const payload, std::size_t len)
-{
-  for(std::size_t i = 0; i < len; ++i)
-  {
-    std::cout << payload[i];
-  }
-  std::cout.flush();
-
-  return 0;
 }
