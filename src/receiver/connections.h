@@ -95,15 +95,14 @@ namespace Bless
   class Channel
   {
     public:
-      typedef std::function<int (unsigned char const *const, std::size_t)>
-        recvCallback;
+      typedef std::function<int (OpaqueMessage &)> recvCallback;
 
       Channel();
       ~Channel();
 
       int init(AuthKeys *keys, const std::string &server,
-        unsigned short port);
-      int connect(Botan::RandomNumberGenerator &rng, recvCallback cb);
+        unsigned short port, recvCallback cb);
+      int connect(Botan::RandomNumberGenerator &rng);
       int listen();
 
     protected:
@@ -113,6 +112,7 @@ namespace Bless
       Botan::Credentials_Manager *credentialsManager;
       Botan::TLS::Server_Information *serverInformation;
       void send(const Botan::byte *const payload, size_t len);
+      void recvData(const Botan::byte *const payload, size_t len);
       void alert(Botan::TLS::Alert alert, const Botan::byte *const payload,
         size_t len);
       bool handshake(const Botan::TLS::Session &session);
@@ -127,6 +127,8 @@ namespace Bless
       AuthKeys *authKeys;
       int connection;
       sockaddr_in connectionInfo;
+      OpaqueMessage partialMessage;
+      recvCallback messageFull;
   };
 }
 #endif //CONNECTIONS_H

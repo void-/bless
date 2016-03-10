@@ -266,14 +266,16 @@ namespace Bless
    * @param keys pointer to initialized AuthKeys to use for authentication.
    * @param server ip address of the Server in the protocol.
    * @param port UDP port to connect to the Server on.
+   * @param cb callback for when a message is received
    * @return non-zero on error.
    */
   int Channel::init(AuthKeys *keys, const std::string &server,
-      unsigned short port)
+      unsigned short port, recvCallback cb)
   {
     int error = 0;
     in_addr address;
     authKeys = keys;
+    messageFull = cb;
 
     //allocate socket
     if((connection = socket(PF_INET, SOCK_DGRAM, 0)) == -1)
@@ -335,11 +337,9 @@ fail:
    * further revealing its location.
    *
    * @param rng RandomNumberGenerator to use for making the connection
-   * @param cb receive callback called whenever a new, authenticated message is
-   * received
    * @return non-zero on error.
    */
-  int Channel::connect(RandomNumberGenerator &rng, recvCallback cb)
+  int Channel::connect(RandomNumberGenerator &rng)
   {
     ::pollfd pollSocket;
     unsigned char readBuffer[bufferSize];
@@ -359,7 +359,9 @@ fail:
         [this](const byte *const data, size_t len) {
           this->send(data, len);
         },
-        cb,
+        [this](const byte *const data, size_t len) {
+          this->recvData(data, len);
+        },
         [this](TLS::Alert alert_, const byte *const data, size_t len) {
           this->alert(alert_, data, len);
         },
@@ -492,6 +494,26 @@ fail:
     {
       throw std::runtime_error("send failed");
     }
+  }
+
+  /**
+   * @brief callback to receive tls plaintext from the Server
+   *
+   */
+  void Channel::recvData(const byte *const payload, size_t len)
+  {
+    //fill part of the message
+    if(partialMessage.deserialize(payload, len))
+    {
+      //still need more bytes
+      return;
+    }
+
+    messageFull(partialMessage);
+
+    //abstraction violation
+    partialMessage.data.fill(0);
+    partialMessage.filled = 0;
   }
 
   /**
