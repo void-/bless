@@ -514,8 +514,16 @@ namespace Bless
     enc.set_associated_data(keyId.data(), keyId.size()); //authenticate keyId
     enc.start(nonce.data(), nonce.size());
 
-    //decrypt all at once, inplace in data
-    enc.finish(data, 0);
+    try
+    {
+      //decrypt all at once, inplace in data
+      enc.finish(data, 0);
+    }
+    catch(Integrity_Failure &e)
+    {
+      //mac failed to verify
+      return -5;
+    }
 
     return 0;
   }
