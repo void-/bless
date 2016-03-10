@@ -5,6 +5,7 @@
 
 #include "auth.h"
 #include "connections.h"
+#include "persistentStore.h"
 
 #include <string>
 #include <iostream>
@@ -151,6 +152,8 @@ int main(int argc, char **argv)
   AuthKeys authKeys;
   Channel chan;
   Botan::AutoSeeded_RNG rng;
+  FileSystemStore senderCerts;
+  FileSystemEphemeralStore ephemeralKeys;
 
   //parse the arguments
   if((error = args.init(argc, argv)))
@@ -164,6 +167,20 @@ int main(int argc, char **argv)
       args.receiverKeyFile, rng)))
   {
     std::cerr << "Failed to load authentication keys" << std::endl;
+    goto fail;
+  }
+
+  //load Sender certificate store
+  if((error = senderCerts.init(args.senderCertsPath)))
+  {
+    std::cerr << "Failed to load Sender certificate store" << std::endl;
+    goto fail;
+  }
+
+  //load Receiver ephemeral key store
+  if((error = senderCerts.init(args.defaultEphemeralKeys)))
+  {
+    std::cerr << "Failed to load ephemeral key store" << std::endl;
     goto fail;
   }
 
