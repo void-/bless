@@ -2,6 +2,8 @@
 
 #include <bless/log.h>
 
+#include <botan/hex.h>
+
 #include <sys/types.h> //for opendir
 #include <cstdio> //for remove
 #include <dirent.h>
@@ -42,14 +44,12 @@ namespace Bless
    * @param path_ the directory path to load certificates from.
    * @return non-zero on failure.
    */
-  int FileSystemStore::init(std::string &path_)
+  int FileSystemStore::init(std::string const &path_)
   {
     int error = 0;
     ::dirent *entry;
     ::DIR *dir = ::opendir(path_.c_str());
-
-    //set member variable
-    path = path_;
+    X509_Certificate *rawCert;
 
     if(dir == nullptr)
     {
@@ -63,16 +63,39 @@ namespace Bless
     {
       try
       {
-        stagedIn.emplace_back(std::string(path_ + "/" + entry->d_name));
-        auto cert = stagedIn.back();
+        std::unique_ptr<X509_Certificate> cert(
+            new X509_Certificate(std::string(path_ + "/" + entry->d_name)));
+        SenderId makeId;
 
         //verify cert is self-signed and valid
-        if(!(cert.is_self_signed() &&
-            cert.check_signature(*cert.subject_public_key())))
+        if(!(cert->is_self_signed() &&
+            cert->check_signature(*cert->subject_public_key())))
         {
           error = -2;
           goto fail;
         }
+
+        //construct SenderId = sha256 of Sender's certificate
+        std::string certId = cert->fingerprint("SHA-256");
+
+        //iterate through string and replace `:' with ` ' to satisfy hex_decode
+        for(auto &c : certId)
+        {
+          if(c == ':')
+          {
+            c = ' ';
+          }
+        }
+
+        if(hex_decode(makeId.data(), certId, true) != makeId.size())
+        {
+          //wrote out an unexpected number of bytes
+          error = -5;
+          goto fail;
+        }
+
+        rawCert = cert.release();
+        stagedIn.push_back(std::tie(makeId, rawCert));
       }
       catch(Decoding_Error &e)
       {
@@ -106,20 +129,22 @@ fail:
    * - - etc.
    *
    * @param cert the certificate from the Sender to verify.
-   * @return 0 if \p cert is valid, an error code otherwise.
+   * @return nullptr if no matching certificate id found
    */
-  int FileSystemStore::isValid(Botan::X509_Certificate const &cert)
+  X509_Certificate *FileSystemStore::getCert(SenderId const &id)
   {
-    bool valid = false;
-
-    //check if any staged in certificate is valid
+    //check if any staged in certificate's id matches
     for(auto &c : stagedIn)
     {
-      valid |= (cert == c);
+      //matches
+      if(std::get<0>(c) == id)
+      {
+        return std::get<1>(c);
+      }
     }
 
-    //if the cert is valid, return 0
-    return valid ? 0 : -1;
+    //no matching certs
+    return nullptr;
   }
 
   /**
@@ -142,14 +167,14 @@ fail:
    * @param path the directory path to load from.
    * @return non-zero on failure
    */
-  int FileSystemEphemeralStore::init(std::string const &path)
+  int FileSystemEphemeralStore::init(std::string const &path,
+      RandomNumberGenerator &rng)
   {
     int error = 0;
     ::dirent *entry;
-    Log &log = Log::getLog();
+    //Log &log = Log::getLog();
     ::DIR *dir = ::opendir(path.c_str());
     outstandingKeys = 0;
-    OpaqueEphemeralKey opaqueKey;
 
     if(dir == nullptr)
     {
@@ -166,23 +191,16 @@ fail:
       std::string name(path + "/" + entry->d_name);
       EphemeralKey *rawK;
 
-      //file -> opaque key
-      if(opaqueKey.deserialize(name))
+      //deserialize file
+      if(k->deserialize(name, rng))
       {
         //deserialization failed, try the next file
         //log.log("Failed to load ephemeral key file ", name);
         continue;
       }
 
-      //opaque key -> private ephemeral key
-      if(k->init(opaqueKey))
-      {
-        //failed to initialize, ignore this key
-        continue;
-      }
-
       //get the `keyId' for k
-      auto keyIdRaw = k->public_value();
+      auto keyIdRaw = k->key->public_value();
       decltype(Message::keyId) keyId;
       if(keyIdRaw.size() != keyId.size())
       {
@@ -201,9 +219,16 @@ fail:
     }
 
     //no keys were loaded
-    if(!keys.size())
+    if(!idToPriv.size())
     {
       error = -2;
+      goto fail;
+    }
+
+    if(idToPriv.size() != keyToFile.size())
+    {
+      //bug somewhere
+      error = -4;
       goto fail;
     }
 
@@ -239,7 +264,7 @@ fail:
     if(it == idToPriv.end())
     {
       //key not found: already used?
-      return -1;
+      return nullptr;
     }
 
     //check key can be found in keyToFile
@@ -247,7 +272,7 @@ fail:
     if(itFile == keyToFile.end())
     {
       //key was deleted, but not removed from idToPriv
-      return -2;
+      return nullptr;
     }
 
     outstandingKeys++;
@@ -273,7 +298,7 @@ fail:
 
     //lookup the key in the map
     auto it = keyToFile.find(key);
-    if(it == fileMap.end())
+    if(it == keyToFile.end())
     {
       //key not found
       return -1;
@@ -302,7 +327,7 @@ fail:
    * @param key the key to reuse
    * @return non-zero on failure.
    */
-  int FileSystemEphemeralStore::release(OpaqueEphemeralKey *key)
+  int FileSystemEphemeralStore::release(EphemeralKey *key)
   {
     if(outstandingKeys == 0)
     {
@@ -312,7 +337,7 @@ fail:
 
     //lookup the key in the map
     auto it = keyToFile.find(key);
-    if(it == fileMap.end())
+    if(it == keyToFile.end())
     {
       //key not found
       return -1;

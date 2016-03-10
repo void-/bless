@@ -22,28 +22,28 @@
 namespace std
 {
   template <>
-  struct hash<decltype(Message::keyId)>
+  struct hash<decltype(Bless::Message::keyId)>
   {
     /**
      * @brief hash by the first 8 bytes of key id
      */
-    size_t operator()(decltype(Message::keyId) const& key) const
+    size_t operator()(decltype(Bless::Message::keyId) key) const
     {
       return *(reinterpret_cast<size_t *>(key.data()));
     }
-  }
+  };
 
   template <>
-  struct hash<EphemeralKey *>
+  struct hash<Bless::EphemeralKey *>
   {
     /**
      * @brief use raw pointer as hash
      */
-    size_t operator()(EphemeralKey * key) const
+    size_t operator()(Bless::EphemeralKey * key) const
     {
       return reinterpret_cast<size_t>(key);
     }
-  }
+  };
 }
 
 namespace Bless
@@ -66,7 +66,9 @@ namespace Bless
   {
     public:
       virtual ~KeyStore();
-      virtual int isValid(Botan::X509_Certificate const &cert) = 0;
+
+      typedef decltype(Message::senderId) SenderId;
+      virtual Botan::X509_Certificate *getCert(SenderId const &id) = 0;
   };
 
   /**
@@ -93,12 +95,11 @@ namespace Bless
       FileSystemStore() = default;
       ~FileSystemStore();
 
-      int init(std::string &path_);
-      int isValid(Botan::X509_Certificate const &cert) override;
+      int init(std::string const &path_);
+      virtual Botan::X509_Certificate *getCert(SenderId const &id) override;
 
     private:
-      std::string path;
-      std::list<Botan::X509_Certificate> stagedIn;
+      std::list<std::tuple<SenderId, Botan::X509_Certificate *>> stagedIn;
   };
 
   /**
@@ -155,10 +156,9 @@ namespace Bless
       FileSystemEphemeralStore() = default;
       ~FileSystemEphemeralStore() override;
 
-      int init(std::string const &path);
+      int init(std::string const &path, Botan::RandomNumberGenerator &rng);
 
-      std::unique_ptr<EphemeralKey> getKey(
-        decltype(Message::keyId) const &id) override;
+      EphemeralKey *getKey(decltype(Message::keyId) const &id) override;
 
       int free(EphemeralKey *key) override;
       int release(EphemeralKey *key) override;
