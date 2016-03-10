@@ -156,6 +156,37 @@ namespace Bless
   }
 
   /**
+   * @brief deserialize a OpaqueEphemeralKey containing a private key.
+   *
+   * @param serializedPrivate the key to deserialize into this.
+   * @return non-zero on failure
+   */
+  int EphemeralKey::init(OpaqueEphemeralKey const &serializedPrivate)
+  {
+    //convert std::array into secure_vector to construct key
+    secure_vector<byte> keyBytes(OpaqueEphemeralKey::keySize);
+    if(buffer_insert(keyBytes, 0, serializedPrivate.getKey(),
+        OpaqueEphemeralKey::keySize) == 0)
+    {
+      return -2;
+    }
+
+    //buffer_insert failed
+    if(keyBytes.size() != OpaqueEphemeralKey::keySize)
+    {
+      return -3;
+    }
+
+    key = std::unique_ptr<Curve25519_PublicKey>(
+      new Curve25519_PrivateKey(keyBytes));
+
+    //copy in signature
+    ::memcpy(sig.data(), serializedPrivate.getSig(), sig.size());
+
+    return 0;
+  }
+
+  /**
    * @brief generate and sign a new Ephemeral key pair
    *
    * @param sigKey key to sign with
