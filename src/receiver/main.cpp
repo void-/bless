@@ -74,7 +74,8 @@ const std::string ListenArgs::defaultReceiverCertFile =
 const std::string ListenArgs::defaultServerCertFile =
   RESOURCE_PATH"serverCert.pem";
 const std::string ListenArgs::defaultSenderCerts = RESOURCE_PATH;
-const std::string ListenArgs::defaultEphemeralKeys = RESOURCE_PATH"/keys/";
+const std::string ListenArgs::defaultEphemeralKeys =
+  RESOURCE_PATH"/keys/priv/";
 
 /**
  * @brief parse the arguments passed into main().
