@@ -453,26 +453,6 @@ namespace Bless
   Channel::~Channel()
   {
     close(connection);
-
-    if(server)
-    {
-      delete server;
-    }
-
-    if(sessionManager)
-    {
-      delete sessionManager;
-    }
-
-    if(credentialsManager)
-    {
-      delete credentialsManager;
-    }
-
-    if(policy)
-    {
-      delete policy;
-    }
   }
 
   /**
@@ -582,16 +562,17 @@ namespace Bless
     //allocate tls server objects
     try
     {
-      policy = new ReceiverChannelPolicy();
-      sessionManager = new TLS::Session_Manager_Noop();
-      auto creds = new ReceiverChannelCredentials();
+      policy.reset(new ReceiverChannelPolicy());
+      sessionManager.reset(new TLS::Session_Manager_Noop());
+      credentialsManager.reset(new ReceiverChannelCredentials());
 
-      if(creds->init(serverKey_, receiverKey_))
+      //init credentials with Server's and Receiver's keys
+      if(dynamic_cast<ReceiverChannelCredentials *>(
+          credentialsManager.get())->init(serverKey_, receiverKey_))
       {
         error = -1;
         goto fail;
       }
-      credentialsManager = creds;
     }
     catch(std::bad_alloc &e)
     {
@@ -626,17 +607,16 @@ fail:
   int ReceiverChannel::connect(sockaddr_in addr)
   {
     int error = 0;
-    Botan::TLS::Server *tmpServer = nullptr;
+    std::unique_ptr<TLS::Server> tmpServer;
     ::pollfd pollSocket;
     sockaddr_in tmpAddr = addr;
     unsigned char readBuffer[bufferSize];
     std::unique_lock<std::mutex> lock;
-    TLS::Server *oldServer;
 
     //create a new connection using socket
     try
     {
-      tmpServer = new Botan::TLS::Server(
+      tmpServer.reset(new Botan::TLS::Server(
         //we capture the candidate address
         [this, tmpAddr](const byte *const data, size_t len) {
           this->send(tmpAddr, data, len);
@@ -658,7 +638,7 @@ fail:
           return this->nextProtocol(proto);
         },
         true,
-        bufferSize);
+        bufferSize));
     }
     catch(std::bad_alloc &e)
     {
@@ -715,31 +695,22 @@ fail:
     }
 
     //if the connection succeeds, shutdown and replace the current connection
-    oldServer = server;
 
     //lock to safely update server
     lock = std::unique_lock<std::mutex>(serverLock);
-    server = tmpServer;
+    std::swap(tmpServer, server);
     receiverAvailable = true;
     receiverCondition.notify_one();
     lock.unlock();
 
-    //don't lock to delete
-    if(oldServer)
+    //close down the old connection
+    if(tmpServer)
     {
-      oldServer->close();
-      delete oldServer;
+      tmpServer->close();
     }
-    return 0;
 
     //if the connection fails; don't modify anything
 fail:
-
-    if(tmpServer)
-    {
-      delete tmpServer;
-    }
-
     return error;
   }
 
@@ -1074,16 +1045,16 @@ fail:
     //allocate tls server objects
     try
     {
-      policy = new SenderChannelPolicy();
-      sessionManager = new TLS::Session_Manager_Noop();
-      auto creds = new SenderChannelCredentials();
+      policy.reset(new SenderChannelPolicy());
+      sessionManager.reset(new TLS::Session_Manager_Noop());
+      credentialsManager.reset(new SenderChannelCredentials());
 
-      if(creds->init(serverKey_, store_))
+      if(dynamic_cast<SenderChannelCredentials *>(credentialsManager.get())->
+          init(serverKey_, store_))
       {
         error = -1;
         goto fail;
       }
-      credentialsManager = creds;
     }
     catch(std::bad_alloc &e)
     {
@@ -1127,7 +1098,9 @@ fail:
       if(key == nullptr)
       {
         //out of keys: don't accept any more connections
+        l.error("Ephemeral keystore exhausted. User must refill.");
         error = -100;
+        stop = true;
         goto shutdown;
       }
 
@@ -1148,7 +1121,7 @@ fail:
       //process the connection
       try
       {
-        server = new Botan::TLS::Server(
+        server.reset(new TLS::Server(
           [this](const byte *const data, size_t len) {
             this->send(data, len);
           },
@@ -1169,7 +1142,7 @@ fail:
             return this->nextProtocol(proto);
           },
           false,
-          bufferSize);
+          bufferSize));
       }
       catch(std::bad_alloc &e)
       {
@@ -1180,7 +1153,7 @@ fail:
       //allocate a message to write to
       try
       {
-        partialMessage = std::unique_ptr<OpaqueMessage>(new OpaqueMessage());
+        partialMessage.reset(new OpaqueMessage());
       }
       catch(std::bad_alloc &e)
       {
@@ -1279,16 +1252,10 @@ fail:
 
 shutdown:
       //successfully received a message from Sender or failure
-      if(server)
-      {
-        delete server;
-      }
+      server.reset();
 
       //deallocate the message
-      if(partialMessage)
-      {
-        partialMessage.reset();
-      }
+      partialMessage.reset();
 
       //free the key
       if(key)

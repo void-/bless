@@ -105,10 +105,10 @@ namespace Bless
     protected:
       Channel();
 
-      Botan::TLS::Server *server;
-      Botan::TLS::Session_Manager *sessionManager;
-      Botan::Credentials_Manager *credentialsManager;
-      Botan::TLS::Policy *policy;
+      std::unique_ptr<Botan::TLS::Server> server;
+      std::unique_ptr<Botan::TLS::Session_Manager> sessionManager;
+      std::unique_ptr<Botan::Credentials_Manager> credentialsManager;
+      std::unique_ptr<Botan::TLS::Policy> policy;
       Botan::RandomNumberGenerator *rng;
 
       int connection;
